@@ -29,6 +29,15 @@ test file exists and its tests are red.
       `src/agentrag/__init__.py`, `src/agentrag/ingestion/__init__.py`,
       `src/agentrag/retrieval/__init__.py`, `src/agentrag/store/__init__.py`,
       `src/agentrag/server/__init__.py`, `tests/unit/`, `tests/integration/`
+- [ ] `tests/conftest.py` — shared pytest fixtures used by every unit test:
+      `tmp_path`-based `Settings` with isolated `data_dir`; mock
+      `SentenceTransformer` returning deterministic 384-dim zero vectors;
+      mock `QdrantClient`; prebuilt `sample_chunks` list. Written once here —
+      no unit test file reimplements these.
+- [ ] `.git/hooks/pre-commit` — shell script that runs
+      `black --check . && ruff check . && mypy --strict src/` before every
+      commit and exits non-zero on any failure. Blocks the commit automatically.
+      No manual verification step required.
 - [ ] `tests/fixtures/sample.txt` — plain-text fixture with ≥ 600 words
       (enough to produce multiple chunks at 512-token chunk size)
 - [ ] `tests/fixtures/sample.pdf` — single-page PDF fixture committed as binary,
@@ -46,6 +55,43 @@ test file exists and its tests are red.
       nowhere else:
       `RawDocument`, `Chunk`, `EmbeddedChunk`, `SearchResult`, `SourceInfo`,
       `IngestResult`, `DeleteResult`, `DocumentContent`
+
+---
+
+**Session protocol — Context7 batch lookup** _(run once after Step 2, before any implementation)_
+
+Before writing any implementation code, query Context7 for every Phase 1
+library in a single batch session. Do not query mid-implementation.
+
+| Library | Topic to query |
+|---------|---------------|
+| `qdrant-client` | embedded client init, upsert, query, delete, filters |
+| `sentence-transformers` | SentenceTransformer, batch encode, model loading |
+| `pydantic-settings` | Settings, env var binding, field defaults |
+| `pymupdf` | fitz.open, page.get_text, document iteration |
+| `typer` | app, command, argument, option |
+| `transformers` | AutoTokenizer, from_pretrained, encode, token counting |
+
+Cache all results in context before Step 3 begins. This eliminates mid-task
+lookup interruptions and keeps implementation flow continuous.
+
+---
+
+**Parallelization note — Steps 4–8**
+
+Steps 4, 5, 6, and 7 (store, reader, chunker, embedder) are fully independent
+once `types.py` and `config.py` exist. When dispatching via parallel
+subagents, assign one agent per step. Each agent receives: `types.py`,
+`config.py`, the step's test spec from this roadmap, and the relevant
+Context7 docs. Step 8 (pipeline) must wait for Steps 4–7 to complete.
+
+```
+types.py + config.py  (sequential — foundation)
+        ↓
+store │ reader │ chunker │ embedder  (4 parallel agents)
+        ↓
+pipeline.py  (sequential — depends on all 4)
+```
 
 ---
 
@@ -148,10 +194,34 @@ test file exists and its tests are red.
       - `agentrag ingest <file>` — calls `pipeline.ingest`, prints `IngestResult`
       - `agentrag list` — calls `store.list_sources()`, prints a source table
       This is the only file that calls `logging.basicConfig()`.
+- [ ] `scripts/verify_phase1.sh` — deterministic exit gate script:
+      ```bash
+      pytest && \
+      mypy --strict src/ && \
+      agentrag ingest tests/fixtures/sample.txt && \
+      agentrag list
+      ```
+      Exit code 0 = phase exit condition met. Replaces manual verification.
+      Run this before declaring Phase 1 complete.
 
 ---
 
-**Step 10 — Integration**
+**Step 10 — Continuous Integration**
+
+- [ ] `.github/workflows/ci.yml` — triggered on every push to `main`:
+      1. Checkout + set up Python 3.12
+      2. `pip install -e ".[dev]"`
+      3. `black --check .`
+      4. `ruff check .`
+      5. `mypy --strict src/`
+      6. `pytest --tb=short`
+      Fails fast on first error. Established in Phase 1 so every subsequent
+      phase push is automatically verified. Phase 5 extends this file with a
+      release/publish job — it does not replace it.
+
+---
+
+**Step 11 — Integration**
 
 - [ ] `tests/integration/test_pipeline.py` — real Qdrant (embedded), real files:
       - ingest `tests/fixtures/sample.txt` → `chunk_count > 0`
@@ -161,9 +231,8 @@ test file exists and its tests are red.
 
 ---
 
-**Exit condition:** `pytest` is green with zero failures. `agentrag ingest
-<file>` followed by `agentrag list` shows the ingested source with correct
-chunk count. `mypy --strict` passes on `src/` with zero errors.
+**Exit condition:** `scripts/verify_phase1.sh` exits with code 0. CI is green
+on `main`. `mypy --strict` passes. No manual verification steps remain.
 
 ---
 
@@ -298,8 +367,11 @@ running MCP server in under 60 seconds.
 - [ ] `pyproject.toml` finalized for PyPI: classifiers, license, description, URLs
 - [ ] `agentrag serve` works via `uvx agentrag serve` (zero-install)
 - [ ] `README.md` with: 60-second quickstart, Claude Desktop config snippet, all CLI flags
-- [ ] GitHub Actions CI: lint + type check + test on push to `main`
-- [ ] GitHub Actions release workflow: tag → PyPI publish
+- [ ] GitHub Actions CI: established in Phase 1 — verify it is still green;
+      extend `.github/workflows/ci.yml` with matrix testing across Python 3.12+
+      if needed
+- [ ] GitHub Actions release workflow: add publish job to existing
+      `.github/workflows/ci.yml` triggered on version tag → PyPI publish
 - [ ] `CHANGELOG.md` with `v0.1.0` entry
 - [ ] PyPI package published and installable
 

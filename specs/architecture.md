@@ -9,8 +9,9 @@ agentrag/
 ├── src/
 │   └── agentrag/
 │       ├── __init__.py
-│       ├── cli.py                  # typer app: `agentrag serve`, `agentrag ingest`
+│       ├── cli.py                  # typer app: `agentrag serve`, `agentrag ingest`, `agentrag list`
 │       ├── config.py               # pydantic-settings Settings dataclass
+│       ├── types.py                # all domain dataclasses — single source of truth
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── reader.py           # file path → RawDocument
@@ -29,16 +30,27 @@ agentrag/
 │           ├── app.py              # FastAPI app + MCP SDK registration
 │           └── tools.py            # MCP tool handlers — delegation only, no business logic
 ├── tests/
+│   ├── conftest.py                 # shared fixtures: mock store, mock embedder, Settings, sample chunks
+│   ├── fixtures/
+│   │   ├── sample.txt              # plain-text ingest fixture (≥ 600 words)
+│   │   └── sample.pdf              # single-page PDF ingest fixture (committed binary)
 │   ├── unit/
+│   │   ├── test_config.py
+│   │   ├── test_store.py
 │   │   ├── test_reader.py
 │   │   ├── test_chunker.py
 │   │   ├── test_embedder.py
-│   │   ├── test_store.py
+│   │   ├── test_pipeline.py
 │   │   ├── test_searcher.py
 │   │   └── test_tools.py
 │   └── integration/
 │       ├── test_pipeline.py
 │       └── test_server.py
+├── scripts/
+│   └── verify_phase1.sh            # runnable exit gate: pytest + mypy + CLI smoke test
+├── .github/
+│   └── workflows/
+│       └── ci.yml                  # lint + typecheck + test on every push to main
 ├── specs/                          # Reference documents — no source code here
 │   ├── mission.md
 │   ├── tech-stack.md
