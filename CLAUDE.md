@@ -312,6 +312,37 @@ Rules:
   fails, investigate and fix the underlying issue — do not bypass it.
 - Amending published commits is not permitted. Create a new commit.
 
+### III.6 Post-Implementation Code Review — Mandatory
+
+After writing any implementation code that will be committed, Claude must
+invoke the `coderabbit:code-review` skill before staging or committing.
+
+**Protocol:**
+
+1. Complete the implementation and ensure `pytest` is green (Article III.4).
+2. Run `black . && ruff check . && mypy src/` and fix all issues.
+3. Invoke the `coderabbit:code-review` skill on the changed files.
+4. Resolve all **blocking** issues (bugs, logic errors, security, broken
+   contracts) before committing. No exceptions.
+5. For **non-blocking** issues (style suggestions, minor improvements): either
+   fix them or document the decision not to in the commit body.
+6. Only after step 4 is satisfied may the commit be staged and pushed.
+
+**Scope:**
+
+- Applies to all Python source files under `src/` and `tests/`.
+- Applies after completing each deliverable listed in the active roadmap phase,
+  not after every individual file change.
+- Does not apply to spec-only changes (`specs/`, `CLAUDE.md`) — those are
+  reviewed by the user, not by CodeRabbit.
+
+**Why this is in the constitution:**
+
+TDD (Article III.4) verifies that code does what the tests specify. CodeRabbit
+catches what tests cannot: architectural drift, subtle logic bugs, missed edge
+cases, security issues, and patterns that will cause pain later. Both gates
+must pass. One does not substitute for the other.
+
 ---
 
 ## Article IV — Architectural Laws
@@ -695,6 +726,7 @@ verify:
 - [ ] No ingestion logic appears in `retrieval/` or vice versa (Article IV.1).
 - [ ] No new dependency was added without appearing in `specs/tech-stack.md` (Article IV.3).
 - [ ] No human-written code entered the codebase (Article VIII).
+- [ ] `coderabbit:code-review` run and all blocking issues resolved (Article III.6).
 - [ ] Changes committed and pushed to `github.com/SARAMALI15792/AgentRAG` (Article IX).
 
 ### X.2 Violations
