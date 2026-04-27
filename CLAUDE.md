@@ -451,12 +451,92 @@ Rules for amendments:
 4. No amendment may be made by Claude without explicit instruction from the
    project owner. Claude may **propose** amendments in response to observed
    gaps or contradictions, but may not write them without approval.
+   Amendments to this constitution are always written by Claude (Article VIII)
+   — the user directs in natural language, Claude writes to disk.
 
 ---
 
-## Article VIII — GitHub Synchronization
+## Article VIII — AI-First Development Mandate
 
-### VIII.1 Repository Identity
+### VIII.1 The Rule
+
+**All source code in this repository is written exclusively by Claude.**
+
+The user's role in this project is direction, specification, review, and
+approval — not implementation. No human-written code may enter the codebase
+directly. Every function, class, test, configuration file, and script is
+produced by Claude following the protocols established in this constitution.
+
+This is not a preference. It is a foundational principle of how this project
+is built. Violating it undermines the integrity of the AI-first development
+workflow and introduces code that has not been subjected to the TDD,
+type-checking, and review protocols this constitution requires.
+
+### VIII.2 What "Code" Means
+
+The no-manual-coding rule applies to:
+
+- All Python source files under `src/` and `tests/`
+- All configuration files: `pyproject.toml`, `ruff.toml`, `mypy.ini`,
+  `.github/` workflows, `Dockerfile` if introduced
+- All shell scripts, Makefiles, or automation scripts
+- All spec files under `specs/` (content, not just formatting)
+- This constitution (`CLAUDE.md`) — amendments are proposed by the user
+  in natural language and written by Claude
+
+The rule does **not** apply to:
+
+- Personal environment files (`.env`, `.env.local`) — the user sets their
+  own secrets and local paths
+- Git credentials and local Git configuration
+- IDE settings and editor config files that do not affect the build
+
+### VIII.3 Correction Protocol
+
+If Claude writes incorrect, incomplete, or non-compiling code:
+
+1. The user describes what is wrong in natural language.
+2. Claude diagnoses the issue, proposes a fix, and awaits approval.
+3. Claude writes the corrected code and pushes the fix as a new commit.
+
+The user must **never** edit source files directly to patch Claude's mistakes.
+Doing so breaks the audit trail, bypasses the toolchain checks, and introduces
+code that has not been verified against this constitution's standards. The
+correction always flows through Claude.
+
+### VIII.4 Review and Approval
+
+The user retains full authority to:
+
+- Reject any code Claude produces and request a rewrite.
+- Redirect the implementation approach before or after code is written.
+- Approve or deny any file creation, deletion, or rename (Article VI).
+- Amend this constitution to change how Claude works (Article X).
+
+Claude's role is to implement with precision and discipline. The user's role
+is to steer with authority. Neither role substitutes for the other.
+
+### VIII.5 Enforcement
+
+Claude must, before writing any code, confirm internally:
+
+- The code being written is within the current roadmap phase scope.
+- A failing test has been written first (TDD, Article III.4).
+- The implementation follows the architectural laws (Article IV).
+- The result will be committed and pushed upon completion (Article IX).
+
+If the user submits a code snippet or partial implementation and asks Claude
+to "use this" or "continue from this", Claude must:
+
+1. Review the submitted code against this constitution's standards.
+2. Rewrite it to comply fully (type annotations, formatting, tests).
+3. Commit the compliant version — not the raw user-submitted version.
+
+---
+
+## Article IX — GitHub Synchronization
+
+### IX.1 Repository Identity
 
 This project is hosted on GitHub under the following identity. All Git
 operations must use these credentials. No other account may push to this
@@ -470,7 +550,7 @@ repository without explicit approval from the project owner.
 | Default Branch | `main` |
 | Visibility | Public |
 
-### VIII.2 Mandatory Push After Every Unit of Work
+### IX.2 Mandatory Push After Every Unit of Work
 
 **Every completed unit of work must be committed and pushed to GitHub before
 the response is considered done.** A unit of work is defined as any of the
@@ -485,7 +565,7 @@ This rule exists because the GitHub repository is the single source of truth.
 Local-only changes are invisible to collaborators, invisible to CI, and at
 risk of loss. There is no such thing as "I'll push it later" in this project.
 
-### VIII.3 Commit and Push Protocol
+### IX.3 Commit and Push Protocol
 
 Every push follows this exact sequence:
 
@@ -500,7 +580,7 @@ Every push follows this exact sequence:
 5. **Report** — include the GitHub commit URL or a confirmation that the
    push succeeded in the response to the user.
 
-### VIII.4 Branch Strategy
+### IX.4 Branch Strategy
 
 - All work in the current phase is committed directly to `main`.
 - Feature branches are introduced only when the project reaches Phase 3 or
@@ -508,7 +588,7 @@ Every push follows this exact sequence:
 - Force-pushing to `main` is forbidden under all circumstances.
 - Amending a pushed commit is forbidden. Create a new commit instead.
 
-### VIII.5 Git Configuration
+### IX.5 Git Configuration
 
 The local repository must always be configured with the correct identity.
 Claude must verify this is set before the first commit in any session:
@@ -522,9 +602,9 @@ If these values are not set, set them before staging anything.
 
 ---
 
-## Article IX — Enforcement
+## Article X — Enforcement
 
-### IX.1 Self-Audit
+### X.1 Self-Audit
 
 Before delivering any response that includes code, Claude must internally
 verify:
@@ -537,9 +617,10 @@ verify:
 - [ ] No business logic leaked into `server/tools.py` (Article IV.1).
 - [ ] No ingestion logic appears in `retrieval/` or vice versa (Article IV.1).
 - [ ] No new dependency was added without appearing in `specs/tech-stack.md` (Article IV.3).
-- [ ] Changes committed and pushed to `github.com/SARAMALI15792/AgentRAG` (Article VIII).
+- [ ] No human-written code entered the codebase (Article VIII).
+- [ ] Changes committed and pushed to `github.com/SARAMALI15792/AgentRAG` (Article IX).
 
-### IX.2 Violations
+### X.2 Violations
 
 If Claude detects that it has violated any article of this constitution:
 
