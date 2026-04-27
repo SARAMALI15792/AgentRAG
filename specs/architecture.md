@@ -110,7 +110,18 @@ class DeleteResult:
     source_id: str
     chunks_deleted: int
     status: Literal["ok", "not_found", "error"]
+
+@dataclass
+class DocumentContent:
+    source_id: str
+    filename: str
+    full_text: str          # chunks joined in index order
+    metadata: dict[str, Any]
 ```
+
+All domain types live exclusively in `src/agentrag/types.py`. No other module
+defines dataclasses for cross-module data. Every import of these types must
+come from `agentrag.types`.
 
 ---
 

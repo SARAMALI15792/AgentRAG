@@ -16,16 +16,34 @@ just the core data pipeline verified through tests and a minimal CLI command.
 
 ### Deliverables
 
+- [ ] Full directory skeleton — all packages and empty stubs created first so
+      imports resolve throughout the session:
+      `src/agentrag/__init__.py`, `src/agentrag/ingestion/__init__.py`,
+      `src/agentrag/retrieval/__init__.py`, `src/agentrag/store/__init__.py`,
+      `src/agentrag/server/__init__.py`, `tests/unit/.gitkeep`,
+      `tests/integration/.gitkeep`
 - [ ] `pyproject.toml` with all Phase 1 dependencies, entry points, and tool config
+- [ ] `src/agentrag/types.py` — all domain dataclasses in one place:
+      `RawDocument`, `Chunk`, `EmbeddedChunk`, `SearchResult`, `SourceInfo`,
+      `IngestResult`, `DeleteResult`, `DocumentContent`
+      No other module defines domain types. All imports come from here.
 - [ ] `src/agentrag/config.py` — typed `Settings` via `pydantic-settings`
 - [ ] `src/agentrag/store/qdrant.py` — Qdrant embedded client wrapper
       - `upsert(chunks)`, `query(vector, top_k, filters)`, `delete(source_id)`, `list_sources()`
+      - Deduplication by `source_id`: `upsert` deletes all existing points for a
+        `source_id` before inserting new ones. Re-ingesting the same file must
+        never produce duplicate chunks. This is a correctness requirement, not a
+        search-quality feature — it belongs here in Phase 1.
 - [ ] `src/agentrag/ingestion/reader.py` — file → raw text
       - Supports: `.pdf` (pymupdf), `.md` (plain), `.txt` (plain)
       - Returns: `RawDocument(source_id, filename, text, metadata)`
 - [ ] `src/agentrag/ingestion/chunker.py` — text → `List[Chunk]`
       - Sliding window: `chunk_size=512` tokens, `overlap=64` tokens
-      - Returns: `List[Chunk(chunk_id, source_id, text, start, end)]`
+      - Tokenizer: use the `sentence-transformers` model's own tokenizer
+        (`AutoTokenizer` from `transformers`) so chunk boundaries align exactly
+        with the embedding model's token vocabulary. Do not use character counts
+        or `tiktoken` — token count must match what the embedder sees.
+      - Returns: `List[Chunk(chunk_id, source_id, text, start_char, end_char, index)]`
 - [ ] `src/agentrag/ingestion/embedder.py` — `List[Chunk]` → `List[EmbeddedChunk]`
       - Uses `sentence-transformers`, model from `Settings`
       - Returns: `List[EmbeddedChunk(chunk_id, source_id, vector, text, metadata)]`
@@ -55,7 +73,9 @@ can connect to it and call all tools successfully.
 - [ ] `src/agentrag/retrieval/searcher.py` — query → `List[SearchResult]`
       - Embeds query, calls Qdrant nearest-neighbor, applies metadata filters
 - [ ] `src/agentrag/retrieval/reranker.py` — stub (identity reranker for now)
-- [ ] `agentrag serve` CLI command — starts MCP server on stdio or HTTP
+- [ ] `agentrag serve` CLI command — transport priority: **stdio first** (Claude
+      Desktop integration is the Phase 2 exit condition), HTTP second.
+      Both transports must work, but stdio is the primary target.
 - [ ] Claude Desktop integration: manual verification that all 7 tools are callable
 - [ ] `tests/unit/test_tools.py` — unit tests for each tool handler (mocked store)
 - [ ] `tests/integration/test_server.py` — HTTP endpoint integration tests via `pytest-asyncio`

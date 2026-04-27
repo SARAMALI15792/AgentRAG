@@ -15,7 +15,7 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | HTTP server | FastAPI | 0.136.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
 | ASGI server | Uvicorn | 0.46.x | Production-grade ASGI runner for FastAPI. |
 | Vector store | `qdrant-client` | 1.17.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
-| Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). |
+| Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). The chunker must tokenize using the same model's `AutoTokenizer` (bundled with `transformers`, already a transitive dependency of `sentence-transformers`) so chunk token counts exactly match what the embedder sees. Do not use character counts or `tiktoken` for chunk sizing. |
 | LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Not used in Phase 1–2. Reserved for future auxiliary tasks (e.g., query expansion, re-ranking via local LLM). Do not add any Ollama calls until a roadmap phase explicitly requires it. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
 | DOCX parsing | `python-docx` | 1.1.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
