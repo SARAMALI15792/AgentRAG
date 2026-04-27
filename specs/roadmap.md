@@ -16,44 +16,154 @@ just the core data pipeline verified through tests and a minimal CLI command.
 
 ### Deliverables
 
-- [ ] Full directory skeleton — all packages and empty stubs created first so
-      imports resolve throughout the session:
+Deliverables follow strict TDD execution order. For every implementation
+module, the test file is written and confirmed **failing** before the
+implementation file is created. No implementation file is opened until its
+test file exists and its tests are red.
+
+---
+
+**Step 1 — Skeleton and fixtures** _(no tests required — no logic)_
+
+- [ ] Full directory skeleton — all packages created first so imports resolve:
       `src/agentrag/__init__.py`, `src/agentrag/ingestion/__init__.py`,
       `src/agentrag/retrieval/__init__.py`, `src/agentrag/store/__init__.py`,
-      `src/agentrag/server/__init__.py`, `tests/unit/.gitkeep`,
-      `tests/integration/.gitkeep`
-- [ ] `pyproject.toml` with all Phase 1 dependencies, entry points, and tool config
-- [ ] `src/agentrag/types.py` — all domain dataclasses in one place:
+      `src/agentrag/server/__init__.py`, `tests/unit/`, `tests/integration/`
+- [ ] `tests/fixtures/sample.txt` — plain-text fixture with ≥ 600 words
+      (enough to produce multiple chunks at 512-token chunk size)
+- [ ] `tests/fixtures/sample.pdf` — single-page PDF fixture committed as binary,
+      produced once via a helper script and never regenerated automatically
+- [ ] `pyproject.toml` — all Phase 1 runtime and dev dependencies, entry points,
+      and full tool config:
+      black `line-length = 88`; ruff extends black; mypy `strict = true`;
+      pytest `asyncio_mode = "auto"`; coverage source = `["src"]`
+
+---
+
+**Step 2 — Domain types** _(no tests — pure dataclasses, zero logic)_
+
+- [ ] `src/agentrag/types.py` — every cross-module dataclass lives here and
+      nowhere else:
       `RawDocument`, `Chunk`, `EmbeddedChunk`, `SearchResult`, `SourceInfo`,
       `IngestResult`, `DeleteResult`, `DocumentContent`
-      No other module defines domain types. All imports come from here.
-- [ ] `src/agentrag/config.py` — typed `Settings` via `pydantic-settings`
-- [ ] `src/agentrag/store/qdrant.py` — Qdrant embedded client wrapper
-      - `upsert(chunks)`, `query(vector, top_k, filters)`, `delete(source_id)`, `list_sources()`
-      - Deduplication by `source_id`: `upsert` deletes all existing points for a
-        `source_id` before inserting new ones. Re-ingesting the same file must
-        never produce duplicate chunks. This is a correctness requirement, not a
-        search-quality feature — it belongs here in Phase 1.
-- [ ] `src/agentrag/ingestion/reader.py` — file → raw text
-      - Supports: `.pdf` (pymupdf), `.md` (plain), `.txt` (plain)
-      - Returns: `RawDocument(source_id, filename, text, metadata)`
-- [ ] `src/agentrag/ingestion/chunker.py` — text → `List[Chunk]`
-      - Sliding window: `chunk_size=512` tokens, `overlap=64` tokens
-      - Tokenizer: use the `sentence-transformers` model's own tokenizer
-        (`AutoTokenizer` from `transformers`) so chunk boundaries align exactly
-        with the embedding model's token vocabulary. Do not use character counts
-        or `tiktoken` — token count must match what the embedder sees.
-      - Returns: `List[Chunk(chunk_id, source_id, text, start_char, end_char, index)]`
-- [ ] `src/agentrag/ingestion/embedder.py` — `List[Chunk]` → `List[EmbeddedChunk]`
-      - Uses `sentence-transformers`, model from `Settings`
-      - Returns: `List[EmbeddedChunk(chunk_id, source_id, vector, text, metadata)]`
-- [ ] `src/agentrag/ingestion/pipeline.py` — orchestrates reader → chunker → embedder → store
-      - `ingest(path: Path, metadata: dict) -> IngestResult`
-- [ ] `src/agentrag/cli.py` — `agentrag ingest <file>` command (manual testing)
-- [ ] `tests/unit/` — full unit test coverage for reader, chunker, embedder, store wrapper
-- [ ] `tests/integration/test_pipeline.py` — end-to-end ingest of a real PDF and TXT file
 
-**Exit condition:** `pytest` is green. `agentrag ingest <file>` stores chunks in Qdrant. `mypy --strict` passes.
+---
+
+**Step 3 — Config**
+
+- [ ] `tests/unit/test_config.py` ← write first, confirm red
+      - default values load without env vars set
+      - env var `AGENTRAG_DATA_DIR` overrides `data_dir`
+      - `data_dir` is created on disk when it does not exist
+      - `vector_dim` defaults to `384`
+- [ ] `src/agentrag/config.py` ← implement to make tests green
+      `Settings` via `pydantic-settings`. Auto-creates `data_dir` on
+      instantiation. Includes `vector_dim: int = 384` (output dimension of
+      `all-MiniLM-L6-v2` — must match the Qdrant collection vector size).
+
+---
+
+**Step 4 — Vector store**
+
+- [ ] `tests/unit/test_store.py` ← write first, confirm red
+      - `upsert` then `query` returns the inserted chunks
+      - `upsert` same `source_id` twice → chunk count unchanged (dedup)
+      - `delete(source_id)` removes all points for that source
+      - `list_sources()` returns correct `SourceInfo` after upsert
+      - `query` on empty collection returns `[]`, does not raise
+      - `list_sources()` on empty store returns `[]`
+- [ ] `src/agentrag/store/qdrant.py` ← implement to make tests green
+      Qdrant embedded client. Collection created on init with
+      `vector_size = settings.vector_dim`, distance = Cosine.
+      `upsert`: deletes all existing points for `source_id` before inserting
+      (dedup by source). Only file in the codebase permitted to import
+      `qdrant_client`.
+
+---
+
+**Step 5 — Reader**
+
+- [ ] `tests/unit/test_reader.py` ← write first, confirm red
+      - `.txt` path → `RawDocument` with correct `text` and `filename`
+      - `.md` path → `RawDocument`
+      - `.pdf` path → `RawDocument` with non-empty `text`
+      - `source_id` is a 16-char hex string (SHA-256 of resolved path)
+      - non-existent path raises `FileNotFoundError`
+      - unsupported extension raises `ValueError`
+      - empty file raises `ValueError`
+- [ ] `src/agentrag/ingestion/reader.py` ← implement to make tests green
+      `source_id = hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:16]`
+      Supports `.pdf` (pymupdf/fitz), `.md` and `.txt` (plain `read_text`).
+
+---
+
+**Step 6 — Chunker**
+
+- [ ] `tests/unit/test_chunker.py` ← write first, confirm red
+      - long text → multiple chunks, each ≤ `chunk_size` tokens
+      - consecutive chunks overlap by `overlap` tokens
+      - text shorter than `chunk_size` → exactly one chunk
+      - `chunk_id` format is `"{source_id}_{index}"`
+      - `index` is zero-based and contiguous
+- [ ] `src/agentrag/ingestion/chunker.py` ← implement to make tests green
+      Uses `AutoTokenizer.from_pretrained(settings.embed_model)` for all token
+      counting so chunk boundaries align exactly with the embedder's vocabulary.
+      Sliding window: `chunk_size = 512` tokens, `overlap = 64` tokens.
+
+---
+
+**Step 7 — Embedder**
+
+- [ ] `tests/unit/test_embedder.py` ← write first, confirm red
+      (SentenceTransformer is mocked — no model download in unit tests)
+      - output list length equals input chunk list length
+      - each vector has length `settings.vector_dim`
+      - `chunk_id`, `source_id`, and `text` are preserved in output
+      - `metadata` dict is passed through unchanged
+- [ ] `src/agentrag/ingestion/embedder.py` ← implement to make tests green
+      Loads `SentenceTransformer(settings.embed_model)`. Batch-encodes all
+      chunk texts in one call. Returns `List[EmbeddedChunk]`.
+
+---
+
+**Step 8 — Pipeline**
+
+- [ ] `tests/unit/test_pipeline.py` ← write first, confirm red
+      (store and embedder are mocked — no Qdrant or model in unit tests)
+      - success: returns `IngestResult(status="ok", chunk_count > 0)`
+      - non-existent file: returns `IngestResult(status="error")`, does not raise
+      - unsupported extension: returns `IngestResult(status="error")`
+      - embedder failure: returns `IngestResult(status="error")`
+- [ ] `src/agentrag/ingestion/pipeline.py` ← implement to make tests green
+      `ingest(path: Path, metadata: dict[str, Any]) -> IngestResult`
+      Orchestrates reader → chunker → embedder → store. All exceptions are
+      caught and surfaced as `IngestResult(status="error", error=str(e))` —
+      the pipeline never raises.
+
+---
+
+**Step 9 — CLI**
+
+- [ ] `src/agentrag/cli.py` — typer app, two commands:
+      - `agentrag ingest <file>` — calls `pipeline.ingest`, prints `IngestResult`
+      - `agentrag list` — calls `store.list_sources()`, prints a source table
+      This is the only file that calls `logging.basicConfig()`.
+
+---
+
+**Step 10 — Integration**
+
+- [ ] `tests/integration/test_pipeline.py` — real Qdrant (embedded), real files:
+      - ingest `tests/fixtures/sample.txt` → `chunk_count > 0`
+      - ingest `tests/fixtures/sample.pdf` → `chunk_count > 0`
+      - re-ingest `sample.txt` → `chunk_count` identical to first ingest (dedup)
+      - `list_sources()` returns the ingested source after ingest
+
+---
+
+**Exit condition:** `pytest` is green with zero failures. `agentrag ingest
+<file>` followed by `agentrag list` shows the ingested source with correct
+chunk count. `mypy --strict` passes on `src/` with zero errors.
 
 ---
 
@@ -66,21 +176,66 @@ can connect to it and call all tools successfully.
 
 ### Deliverables
 
-- [ ] `src/agentrag/server/app.py` — FastAPI app with MCP SDK integration
-- [ ] `src/agentrag/server/tools.py` — all 7 MCP tool handlers (thin delegation only)
-      - `ingest_file`, `ingest_directory`, `search_documents`, `search_by_metadata`,
-        `list_sources`, `get_document`, `delete_source`
-- [ ] `src/agentrag/retrieval/searcher.py` — query → `List[SearchResult]`
-      - Embeds query, calls Qdrant nearest-neighbor, applies metadata filters
-- [ ] `src/agentrag/retrieval/reranker.py` — stub (identity reranker for now)
-- [ ] `agentrag serve` CLI command — transport priority: **stdio first** (Claude
-      Desktop integration is the Phase 2 exit condition), HTTP second.
-      Both transports must work, but stdio is the primary target.
-- [ ] Claude Desktop integration: manual verification that all 7 tools are callable
-- [ ] `tests/unit/test_tools.py` — unit tests for each tool handler (mocked store)
-- [ ] `tests/integration/test_server.py` — HTTP endpoint integration tests via `pytest-asyncio`
+Deliverables follow strict TDD execution order. Test file written and
+confirmed failing before each implementation file is created.
 
-**Exit condition:** All 7 MCP tools callable from Claude Desktop. `pytest` green. `mypy --strict` passes.
+---
+
+**Step 1 — Retrieval**
+
+- [ ] `tests/unit/test_searcher.py` ← write first, confirm red
+      (store mocked — no Qdrant in unit tests)
+      - query returns `List[SearchResult]` ranked by score descending
+      - `top_k` parameter limits result count
+      - empty result from store → empty list returned, no exception
+      - metadata filters are forwarded to the store query unchanged
+- [ ] `src/agentrag/retrieval/searcher.py` ← implement to make tests green
+      Embeds query via `embedder.py` (query embedding only — permitted cross-
+      boundary per architecture), calls `store.query`, applies `reranker`.
+- [ ] `src/agentrag/retrieval/reranker.py` — identity stub: returns input
+      unchanged. No tests needed for an identity function.
+
+---
+
+**Step 2 — MCP tools**
+
+- [ ] `tests/unit/test_tools.py` ← write first, confirm red
+      (pipeline, searcher, store all mocked)
+      - each of the 7 handlers delegates to the correct backing function
+      - `ingest_file`: non-existent path → error result surfaced, not raised
+      - `delete_source`: unknown source_id → `status="not_found"` returned
+      - `search_documents`: empty query raises `ValueError`
+      - `get_document`: unknown source_id raises `ValueError`
+      - `search_by_metadata`: empty filters raises `ValueError`
+- [ ] `src/agentrag/server/tools.py` ← implement to make tests green
+      All 7 handlers: `ingest_file`, `ingest_directory`, `search_documents`,
+      `search_by_metadata`, `list_sources`, `get_document`, `delete_source`.
+      `ingest_directory` in Phase 2 supports Phase 1 file types only
+      (`.pdf`, `.md`, `.txt`) — Phase 3 extends it to additional types.
+      Each handler is ≤ 15 lines of meaningful code (Article IV.1).
+
+---
+
+**Step 3 — Server**
+
+- [ ] `src/agentrag/server/app.py` — FastAPI app with MCP SDK tool registration.
+      Transport priority: **stdio first** (Claude Desktop is the exit condition),
+      HTTP second. Both must function.
+- [ ] `agentrag serve` added to `cli.py` — starts the MCP server.
+- [ ] `tests/integration/test_server.py` — HTTP transport tests via
+      `pytest-asyncio` + `httpx`. Tests each of the 7 tools over HTTP.
+
+---
+
+**Step 4 — Manual verification**
+
+- [ ] Claude Desktop integration: connect via stdio, call all 7 tools manually,
+      confirm correct responses for both happy-path and error inputs.
+
+---
+
+**Exit condition:** All 7 MCP tools callable from Claude Desktop via stdio.
+`pytest` green. `mypy --strict` passes on `src/` with zero errors.
 
 ---
 
@@ -113,13 +268,21 @@ re-ranking, and deduplication on re-ingest.
 
 ### Deliverables
 
-- [ ] Metadata filter logic in `searcher.py` (all `search_documents` filter keys work)
-- [ ] Cross-encoder re-ranker in `reranker.py` (optional, activated via config)
-- [ ] Source deduplication: re-ingesting the same file updates chunks, does not duplicate
+- [ ] Metadata filter logic in `searcher.py` — all filter keys in
+      `search_documents` and `search_by_metadata` are applied correctly;
+      at least 3 filter fields covered by integration tests
+- [ ] Cross-encoder re-ranker in `reranker.py` — real implementation
+      (optional, activated via `AGENTRAG_RERANK=true` config flag);
+      identity reranker remains the default
+- [ ] Concurrent upsert safety: verify that re-ingesting the same file
+      from two simultaneous calls does not produce duplicate or corrupt
+      chunks (basic stress test, not a strict concurrency guarantee)
 - [ ] `search_by_metadata` tool fully functional with at least 3 filter fields
-- [ ] Benchmarks: retrieval quality tested on a sample corpus (results logged, not gated)
+- [ ] Benchmarks: retrieval quality tested on a sample corpus (results logged,
+      not gated on a score threshold)
 
-**Exit condition:** Re-ingest is idempotent. Metadata filters work end-to-end. `pytest` green.
+**Exit condition:** Metadata filters work end-to-end. Re-ranker activates via
+config. `pytest` green. `mypy --strict` passes.
 
 ---
 

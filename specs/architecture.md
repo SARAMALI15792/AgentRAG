@@ -125,6 +125,31 @@ come from `agentrag.types`.
 
 ---
 
+## source_id Contract
+
+`source_id` is a stable, collision-resistant identifier for a file. It is
+computed once in `reader.py` and must be reproduced identically by any code
+that needs to reference the same source.
+
+```python
+import hashlib
+from pathlib import Path
+
+def make_source_id(path: Path) -> str:
+    return hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:16]
+```
+
+Rules:
+- Always use the **resolved absolute path** (symlinks expanded, `..` collapsed).
+- Truncate to the first 16 hex characters (64-bit collision resistance —
+  sufficient for a single-user local store).
+- Never use the filename alone — two files with the same name in different
+  directories must produce different `source_id` values.
+- `store/qdrant.py` uses `source_id` as the partition key for deduplication.
+  Any change to this function invalidates all stored data.
+
+---
+
 ## Data Flow
 
 ### Ingestion Path
