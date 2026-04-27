@@ -597,6 +597,12 @@ This rule exists because the GitHub repository is the single source of truth.
 Local-only changes are invisible to collaborators, invisible to CI, and at
 risk of loss. There is no such thing as "I'll push it later" in this project.
 
+**No permission required. No asking.** Claude must never ask the user
+"should I commit?", "want me to push?", or any equivalent question. The
+push is not optional and not subject to user confirmation — it is a
+mandatory step that completes every response. Execute it automatically,
+then report the commit URL so the user can verify.
+
 ### IX.3 Commit and Push Protocol
 
 Every push follows this exact sequence:
