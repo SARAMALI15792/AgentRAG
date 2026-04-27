@@ -11,12 +11,12 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Layer | Library / Tool | Version | Rationale |
 |---|---|---|---|
 | Language | Python | 3.12+ | Structural pattern matching, `tomllib`, typing improvements. Minimum enforced in `pyproject.toml`. |
-| MCP server | `mcp` (official Python SDK) | latest stable | stdio and HTTP transports. First-class tool registration. |
+| MCP server | `mcp` (official Python SDK) | ≥1.0, pin exact version in `pyproject.toml` | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. |
 | HTTP server | FastAPI | 0.111.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
 | ASGI server | Uvicorn | 0.29.x | Production-grade ASGI runner for FastAPI. |
 | Vector store | `qdrant-client` | 1.9.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
 | Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). |
-| LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Claude is the MCP client — Ollama is available for auxiliary tasks if needed. |
+| LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Not used in Phase 1–2. Reserved for future auxiliary tasks (e.g., query expansion, re-ranking via local LLM). Do not add any Ollama calls until a roadmap phase explicitly requires it. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
 | DOCX parsing | `python-docx` | 1.1.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
 | HTML parsing | `beautifulsoup4` | 4.12.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
@@ -33,9 +33,10 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Ruff | 0.4.x | Linter and import sorter. Extends Black config. |
 | mypy | 1.10.x | Static type checker. `--strict` mode. |
 | pytest | 8.x | Test runner. Only test framework permitted. |
-| pytest-asyncio | 0.23.x | Async test support for FastAPI endpoints. |
+| pytest-asyncio | 0.23.x | Async test support for FastAPI endpoints. Must be configured with `asyncio_mode = "auto"` in `pyproject.toml` `[tool.pytest.ini_options]` — the default `strict` mode requires manual `@pytest.mark.asyncio` on every async test. |
 | pytest-cov | 5.x | Coverage reporting. |
 | hatchling | latest | Build backend for PyPI packaging. |
+| httpx | 0.27.x | Async HTTP test client. Required by `pytest-asyncio` integration tests against the FastAPI server. Must be listed as a dev dependency, not a runtime dependency. |
 
 ---
 
@@ -48,6 +49,21 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Entry point | `agentrag = agentrag.cli:app` |
 | Python requires | `>=3.12` |
 | Distribution | PyPI (`pip install agentrag`) + `uvx agentrag serve` |
+
+---
+
+## Logging
+
+All structured logging in this project uses Python's standard `logging` module.
+No third-party logging library (structlog, loguru, etc.) is permitted without
+explicit approval.
+
+| Rule | Detail |
+|------|--------|
+| Logger per module | Each module calls `logging.getLogger(__name__)` at module level. |
+| Level | `INFO` by default. `DEBUG` reserved for verbose tracing (embedding times, chunk counts). |
+| No `print()` | All observable output goes through `logging`. `print()` is forbidden in production code paths. |
+| Caller responsibility | The CLI (`cli.py`) is responsible for calling `logging.basicConfig()`. Library code never configures the root logger. |
 
 ---
 

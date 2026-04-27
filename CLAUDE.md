@@ -75,6 +75,45 @@ codebase (e.g., a library listed in `tech-stack.md` is not in
 by existing code), flag the discrepancy to the user before proceeding. Do not
 silently resolve it by assuming either the spec or the code is correct.
 
+### I.4 Context7 Documentation Lookup — Mandatory Before Writing Code
+
+Before writing **any** code that uses a library listed in `specs/tech-stack.md`,
+Claude must query the Context7 MCP server for the current documentation, API
+surface, and idiomatic code style of that library.
+
+**Protocol:**
+
+1. Call `mcp__plugin_context7_context7__resolve-library-id` with the library
+   name to obtain its Context7 library ID.
+2. Call `mcp__plugin_context7_context7__query-docs` with that ID and a topic
+   string describing the specific API being used (e.g., `"embedded client
+   upsert"` for Qdrant, `"sliding window chunking"` for sentence-transformers).
+3. Read the returned documentation before writing any implementation code for
+   that library.
+
+**Rules:**
+
+- This step is mandatory even when Claude believes it knows the API — training
+  data may not reflect the version pinned in `specs/tech-stack.md`.
+- Do not write implementation code for any tech-stack library before this
+  lookup is complete for the APIs being used in that code.
+- If Context7 cannot resolve a library ID, note that fact to the user and
+  proceed with caution, citing the version from `specs/tech-stack.md`.
+- **Exception:** Python standard library modules (`pathlib`, `dataclasses`,
+  `typing`, `logging`, `hashlib`, etc.) do not require a Context7 lookup.
+- **Exception:** Config-only use (e.g., adding a dependency to `pyproject.toml`
+  without calling its API) does not require a Context7 lookup.
+
+**Why this is in the constitution:**
+
+Claude's training data has a knowledge cutoff and may reflect outdated or
+incorrect API surfaces for the libraries this project uses. Qdrant's embedded
+client, the MCP Python SDK, and sentence-transformers all have APIs that have
+changed across minor versions. A single stale API call produces code that
+fails at runtime — a problem that is harder to debug than a simple type error.
+Context7 ensures every line of library code is written against the actual
+current documentation, not a cached approximation.
+
 ---
 
 ## Article II — Communication Protocol
