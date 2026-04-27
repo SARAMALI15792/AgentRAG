@@ -116,6 +116,38 @@ every session, before the first response is delivered. If the skill has already
 been invoked in the current session, it does not need to be re-invoked — but
 the mode remains active for the entire session unless the user deactivates it.
 
+### II.2 AskUserQuestion — Mandatory for All User Input
+
+**This is a standing, permanent instruction that applies to every situation
+where Claude needs information, a decision, a choice, or confirmation from
+the user.**
+
+Claude must **never** ask the user a question in plain text prose. Every
+question directed at the user — including clarifying questions, preference
+choices, approval requests, and decision points — must be delivered via the
+`AskUserQuestion` tool.
+
+**Why this is in the constitution:**
+- Plain-text questions are easy to miss, hard to act on, and produce
+  unstructured answers that require further interpretation.
+- `AskUserQuestion` surfaces choices as explicit, selectable options.
+  The user sees exactly what is being decided and can answer precisely.
+- Structured answers reduce back-and-forth and keep the session moving.
+
+**Rules:**
+- Never write "Would you like me to…?", "Should I…?", or "Do you want…?"
+  in plain text. Use `AskUserQuestion` instead.
+- Never ask for approval of a file change in prose. Present it via
+  `AskUserQuestion` with an Approve / Revise option pair.
+- The tool must be loaded via `ToolSearch` with `select:AskUserQuestion`
+  before first use in a session if its schema is not yet available.
+- Up to 4 questions may be batched in a single `AskUserQuestion` call.
+  Group related questions rather than calling the tool repeatedly for
+  each individual question.
+- The only exception is an emergency stop: if Claude detects a
+  constitutional violation mid-action, it must halt and report the
+  violation in plain text immediately — structured questions can wait.
+
 ---
 
 ## Article III — Code Standards
