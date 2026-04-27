@@ -1,4 +1,4 @@
-# Tech Stack
+yes# Tech Stack
 
 All library choices are locked unless a change is approved through the normal
 file-operation protocol (Article IV of the constitution). Adding a new
@@ -12,9 +12,9 @@ dependency requires user approval before it appears in `pyproject.toml`.
 |---|---|---|---|
 | Language | Python | 3.12+ | Structural pattern matching, `tomllib`, typing improvements. Minimum enforced in `pyproject.toml`. |
 | MCP server | `mcp` (official Python SDK) | ≥1.0, pin exact version in `pyproject.toml` | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. |
-| HTTP server | FastAPI | 0.111.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
-| ASGI server | Uvicorn | 0.29.x | Production-grade ASGI runner for FastAPI. |
-| Vector store | `qdrant-client` | 1.9.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
+| HTTP server | FastAPI | 0.136.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
+| ASGI server | Uvicorn | 0.46.x | Production-grade ASGI runner for FastAPI. |
+| Vector store | `qdrant-client` | 1.17.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
 | Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). |
 | LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Not used in Phase 1–2. Reserved for future auxiliary tasks (e.g., query expansion, re-ranking via local LLM). Do not add any Ollama calls until a roadmap phase explicitly requires it. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
@@ -29,11 +29,11 @@ dependency requires user approval before it appears in `pyproject.toml`.
 
 | Tool | Version | Role |
 |---|---|---|
-| Black | 24.x | Code formatter. `line-length = 88`. |
-| Ruff | 0.4.x | Linter and import sorter. Extends Black config. |
-| mypy | 1.10.x | Static type checker. `--strict` mode. |
+| Black | 25.x | Code formatter. `line-length = 88`. 25.x introduces the 2026 stable style — use this series for all formatting. |
+| Ruff | 0.15.x | Linter and import sorter. Extends Black config. 0.15.x adds significant new rules over 0.4.x — pin to `0.15.x` floor. |
+| mypy | 1.10.x | Static type checker. `--strict` mode. Minimum 1.10; pin exact version in `pyproject.toml`. |
 | pytest | 8.x | Test runner. Only test framework permitted. |
-| pytest-asyncio | 0.23.x | Async test support for FastAPI endpoints. Must be configured with `asyncio_mode = "auto"` in `pyproject.toml` `[tool.pytest.ini_options]` — the default `strict` mode requires manual `@pytest.mark.asyncio` on every async test. |
+| pytest-asyncio | 1.3.x | Async test support for FastAPI endpoints. **Breaking change from 0.x:** version 1.x changed the default mode and deprecated several fixture patterns. Must be configured with `asyncio_mode = "auto"` in `pyproject.toml` under `[tool.pytest.ini_options]`. Do not use 0.x patterns (`@pytest.mark.asyncio` decorator, `event_loop` fixture) — they are removed in 1.x. |
 | pytest-cov | 5.x | Coverage reporting. |
 | hatchling | latest | Build backend for PyPI packaging. |
 | httpx | 0.27.x | Async HTTP test client. Required by `pytest-asyncio` integration tests against the FastAPI server. Must be listed as a dev dependency, not a runtime dependency. |
