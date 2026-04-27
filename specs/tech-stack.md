@@ -1,0 +1,79 @@
+# Tech Stack
+
+All library choices are locked unless a change is approved through the normal
+file-operation protocol (Article IV of the constitution). Adding a new
+dependency requires user approval before it appears in `pyproject.toml`.
+
+---
+
+## Runtime Stack
+
+| Layer | Library / Tool | Version | Rationale |
+|---|---|---|---|
+| Language | Python | 3.12+ | Structural pattern matching, `tomllib`, typing improvements. Minimum enforced in `pyproject.toml`. |
+| MCP server | `mcp` (official Python SDK) | latest stable | stdio and HTTP transports. First-class tool registration. |
+| HTTP server | FastAPI | 0.111.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
+| ASGI server | Uvicorn | 0.29.x | Production-grade ASGI runner for FastAPI. |
+| Vector store | `qdrant-client` | 1.9.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
+| Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). |
+| LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Claude is the MCP client — Ollama is available for auxiliary tasks if needed. |
+| PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
+| DOCX parsing | `python-docx` | 1.1.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
+| HTML parsing | `beautifulsoup4` | 4.12.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
+| Settings | `pydantic-settings` | 2.x | Typed settings from env vars and `.env` files. Powers `src/agentrag/config.py`. |
+| CLI | `typer` | 0.12.x | Builds `agentrag serve` and `agentrag ingest` CLI commands from type-annotated functions. |
+
+---
+
+## Developer Tooling
+
+| Tool | Version | Role |
+|---|---|---|
+| Black | 24.x | Code formatter. `line-length = 88`. |
+| Ruff | 0.4.x | Linter and import sorter. Extends Black config. |
+| mypy | 1.10.x | Static type checker. `--strict` mode. |
+| pytest | 8.x | Test runner. Only test framework permitted. |
+| pytest-asyncio | 0.23.x | Async test support for FastAPI endpoints. |
+| pytest-cov | 5.x | Coverage reporting. |
+| hatchling | latest | Build backend for PyPI packaging. |
+
+---
+
+## Packaging
+
+| Setting | Value |
+|---|---|
+| Build backend | `hatchling` |
+| Package name | `agentrag` |
+| Entry point | `agentrag = agentrag.cli:app` |
+| Python requires | `>=3.12` |
+| Distribution | PyPI (`pip install agentrag`) + `uvx agentrag serve` |
+
+---
+
+## Explicitly Excluded Libraries
+
+These libraries are **not permitted** in this codebase. Adding them requires
+amending this spec with user approval.
+
+| Library | Reason for exclusion |
+|---|---|
+| LangChain | Unnecessary abstraction for our narrow scope. Hides what RAG is actually doing. |
+| LlamaIndex | Same reason as LangChain. We own the pipeline. |
+| OpenAI SDK | All embeddings are local. No external API dependency in core path. |
+| `unittest` | `pytest` only. `unittest` is not permitted. |
+
+---
+
+## Environment Variables
+
+All configuration is loaded via `pydantic-settings` from environment or `.env`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGENTRAG_DATA_DIR` | `~/.agentrag` | Root directory for Qdrant data and config |
+| `AGENTRAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model name |
+| `AGENTRAG_CHUNK_SIZE` | `512` | Token chunk size for splitting |
+| `AGENTRAG_CHUNK_OVERLAP` | `64` | Token overlap between chunks |
+| `AGENTRAG_PORT` | `8000` | HTTP port when using HTTP transport |
+| `AGENTRAG_TRANSPORT` | `stdio` | `stdio` or `http` |
