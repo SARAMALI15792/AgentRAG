@@ -94,4 +94,7 @@ All configuration is loaded via `pydantic-settings` from environment or `.env`:
 | `AGENTRAG_CHUNK_OVERLAP` | `64` | Token overlap between chunks |
 | `AGENTRAG_PORT` | `8000` | HTTP port when using HTTP transport |
 | `AGENTRAG_TRANSPORT` | `stdio` | `stdio` or `http` |
-| `AGENTRAG_RERANK` | `false` | Set to `true` to activate cross-encoder re-ranking (Phase 4+). Identity reranker is used when `false`. |
+| `AGENTRAG_RERANK` | `false` | Set to `true` to activate cross-encoder re-ranking (Phase 5+). Identity reranker is used when `false`. |
+| `AGENTRAG_OLLAMA_URL` | `http://localhost:11434` | Ollama HTTP endpoint used by `query_planner.py` and `evaluator.py` (Phase 3+). If unreachable, both modules degrade gracefully — retrieval is never blocked. |
+| `AGENTRAG_OLLAMA_MODEL` | `llama3.2` | Ollama model for query decomposition and chunk evaluation. Any model served by the local Ollama instance is valid. |
+| `AGENTRAG_QUERY_EXPAND` | `false` | Set to `true` to enable Ollama-backed query expansion in `plan_query`. When `false`, `plan_query` returns the original query unchanged without calling Ollama. |

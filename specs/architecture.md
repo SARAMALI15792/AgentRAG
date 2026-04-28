@@ -21,7 +21,9 @@ agentrag/
 │       ├── retrieval/
 │       │   ├── __init__.py
 │       │   ├── searcher.py         # query string → List[SearchResult]
-│       │   └── reranker.py         # List[SearchResult] → List[SearchResult] (re-ranked)
+│       │   ├── reranker.py         # List[SearchResult] → List[SearchResult] (re-ranked)
+│       │   ├── query_planner.py    # str → QueryPlan (Ollama-backed, graceful degrade)
+│       │   └── evaluator.py        # (query, results) → EvaluationReport (Ollama-backed)
 │       ├── store/
 │       │   ├── __init__.py
 │       │   └── qdrant.py           # all Qdrant interactions — no other module imports qdrant_client
@@ -42,10 +44,14 @@ agentrag/
 │   │   ├── test_embedder.py
 │   │   ├── test_pipeline.py
 │   │   ├── test_searcher.py
-│   │   └── test_tools.py
+│   │   ├── test_tools.py
+│   │   ├── test_query_planner.py
+│   │   ├── test_evaluator.py
+│   │   └── test_agentic_tools.py
 │   └── integration/
 │       ├── test_pipeline.py
-│       └── test_server.py
+│       ├── test_server.py
+│       └── test_agentic_retrieval.py
 ├── scripts/
 │   └── verify_phase1.sh            # runnable exit gate: pytest + mypy + CLI smoke test
 ├── .github/
@@ -129,6 +135,27 @@ class DocumentContent:
     filename: str
     full_text: str          # chunks joined in index order
     metadata: dict[str, Any]
+
+# Phase 3 — Agentic Retrieval types
+
+@dataclass
+class QueryPlan:
+    original_query: str
+    sub_queries: list[str]  # 1–4 focused sub-questions; always includes original
+
+@dataclass
+class ChunkScore:
+    chunk_id: str
+    source_id: str
+    score: float            # 0.0 (irrelevant) → 1.0 (directly answers query)
+    reason: str             # one-sentence explanation
+
+@dataclass
+class EvaluationReport:
+    query: str
+    scored_chunks: list[ChunkScore]
+    sufficient: bool        # True if any chunk scores ≥ 0.7
+    suggested_queries: list[str]  # alternative queries when not sufficient
 ```
 
 All domain types live exclusively in `src/agentrag/types.py`. No other module
@@ -358,8 +385,10 @@ server/tools.py
   └─▶ retrieval/searcher.py   ─▶ embedder, store
   └─▶ store/qdrant.py
 
-retrieval/ ──▶ store/
-ingestion/ ──▶ store/
+retrieval/searcher.py      ──▶ store/, ingestion/embedder.py (query embed only)
+retrieval/query_planner.py ──▶ (external: Ollama HTTP only)
+retrieval/evaluator.py     ──▶ (external: Ollama HTTP only)
+ingestion/                 ──▶ store/
 
 store/ ──▶ (nothing internal — only qdrant_client)
 ```

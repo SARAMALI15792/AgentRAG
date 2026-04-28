@@ -216,7 +216,7 @@ pipeline.py  (sequential — depends on all 4)
       5. `mypy --strict src/`
       6. `pytest --tb=short`
       Fails fast on first error. Established in Phase 1 so every subsequent
-      phase push is automatically verified. Phase 5 extends this file with a
+      phase push is automatically verified. Phase 6 extends this file with a
       release/publish job — it does not replace it.
 
 ---
@@ -280,7 +280,7 @@ confirmed failing before each implementation file is created.
       All 7 handlers: `ingest_file`, `ingest_directory`, `search_documents`,
       `search_by_metadata`, `list_sources`, `get_document`, `delete_source`.
       `ingest_directory` in Phase 2 supports Phase 1 file types only
-      (`.pdf`, `.md`, `.txt`) — Phase 3 extends it to additional types.
+      (`.pdf`, `.md`, `.txt`) — Phase 4 extends it to additional types.
       Each handler is ≤ 15 lines of meaningful code (Article IV.1).
 
 ---
@@ -308,9 +308,124 @@ confirmed failing before each implementation file is created.
 
 ---
 
-## Phase 3 — Extended File Support
+## Phase 3 — Agentic Retrieval Loop
 
 **Entry condition:** Phase 2 exit condition met.
+
+**Goal:** Transform AgentRAG from a passive RAG server into an active retrieval
+partner. Add three MCP tools that close the single-pass retrieval gap: query
+decomposition, relevance evaluation, and multi-query search. After this phase,
+Claude can decompose a complex question into sub-queries, search each
+independently, evaluate whether the results actually answer the question, and
+decide whether to re-search — all through tool calls, without special prompting.
+
+### Deliverables
+
+Deliverables follow strict TDD execution order. Test file written and
+confirmed failing before each implementation file is created.
+
+---
+
+**Step 1 — New domain types** _(no tests — pure dataclasses)_
+
+Add to `src/agentrag/types.py`:
+
+```python
+@dataclass
+class QueryPlan:
+    original_query: str
+    sub_queries: list[str]   # 1–4 focused sub-questions derived from original
+
+@dataclass
+class ChunkScore:
+    chunk_id: str
+    source_id: str
+    score: float             # 0.0 (irrelevant) → 1.0 (directly answers query)
+    reason: str              # one-sentence explanation of the score
+
+@dataclass
+class EvaluationReport:
+    query: str
+    scored_chunks: list[ChunkScore]
+    sufficient: bool         # True if at least one chunk scores ≥ 0.7
+    suggested_queries: list[str]  # alternative queries if not sufficient
+```
+
+---
+
+**Step 2 — Query planner**
+
+- [ ] `tests/unit/test_query_planner.py` ← write first, confirm red
+      (Ollama is mocked — no live model in unit tests)
+      - simple query → `QueryPlan` with `sub_queries = [original_query]`
+      - compound query ("compare X and Y") → `sub_queries` has ≥ 2 items
+      - Ollama unavailable → degrades gracefully, returns single-item plan
+      - `original_query` always preserved in output
+- [ ] `src/agentrag/retrieval/query_planner.py` ← implement to make tests green
+      Calls Ollama HTTP API (`AGENTRAG_OLLAMA_URL`) to decompose the query.
+      Prompt instructs the model to return a JSON list of sub-questions.
+      Graceful degradation: if Ollama is unreachable or returns invalid JSON,
+      returns `QueryPlan(original_query, sub_queries=[original_query])`.
+
+---
+
+**Step 3 — Chunk evaluator**
+
+- [ ] `tests/unit/test_evaluator.py` ← write first, confirm red
+      (Ollama mocked — no live model in unit tests)
+      - all chunks score ≥ 0.7 → `sufficient = True`
+      - all chunks score < 0.7 → `sufficient = False`, `suggested_queries` non-empty
+      - empty chunk list → `sufficient = False`
+      - each `ChunkScore.score` is in `[0.0, 1.0]`
+- [ ] `src/agentrag/retrieval/evaluator.py` ← implement to make tests green
+      Calls Ollama to score each chunk's relevance to the query.
+      Graceful degradation: if Ollama unavailable, scores all chunks at `0.5`
+      and sets `sufficient = True` (pass-through — does not block retrieval).
+
+---
+
+**Step 4 — New MCP tool handlers**
+
+- [ ] `tests/unit/test_agentic_tools.py` ← write first, confirm red
+      (query_planner, evaluator, searcher all mocked)
+      - `search_multi`: merges results from 3 queries, deduplicates by `chunk_id`
+      - `search_multi`: empty `queries` list raises `ValueError`
+      - `evaluate_chunks`: delegates to evaluator, returns `EvaluationReport`
+      - `plan_query`: delegates to query_planner, returns `QueryPlan`
+      - all handlers ≤ 15 lines of meaningful code (Article IV.1)
+- [ ] Add to `src/agentrag/server/tools.py`:
+      - `search_multi(queries: list[str], top_k: int) -> list[SearchResult]`
+        Calls `searcher.search` for each query, deduplicates by `chunk_id`
+        (keeping highest score), returns merged list sorted by score descending.
+      - `evaluate_chunks(query: str, results: list[SearchResult]) -> EvaluationReport`
+        Thin delegate to `evaluator.evaluate`.
+      - `plan_query(query: str) -> QueryPlan`
+        Thin delegate to `query_planner.plan`.
+
+---
+
+**Step 5 — Integration**
+
+- [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Ollama optional:
+      - ingest `sample.txt`, call `plan_query` → verify sub-queries are strings
+      - call `search_multi` with 2 queries → result count ≤ `top_k`, no duplicates
+      - call `evaluate_chunks` on results → `EvaluationReport` returned without error
+      - full loop: `plan_query` → `search_multi` → `evaluate_chunks` → if not
+        sufficient → `search_multi` with `suggested_queries` → verify second pass
+        returns results
+      - Ollama absent: all three tools complete without raising (graceful degrade)
+
+---
+
+**Exit condition:** `search_multi`, `evaluate_chunks`, and `plan_query` are
+callable from Claude Desktop. Full agentic loop test passes. Ollama degradation
+verified. `pytest` green. `mypy --strict` passes.
+
+---
+
+## Phase 4 — Extended File Support
+
+**Entry condition:** Phase 3 exit condition met.
 
 **Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
 `ingest_directory` to handle all supported types recursively.
@@ -328,9 +443,9 @@ confirmed failing before each implementation file is created.
 
 ---
 
-## Phase 4 — Search Quality
+## Phase 5 — Search Quality
 
-**Entry condition:** Phase 3 exit condition met.
+**Entry condition:** Phase 4 exit condition met.
 
 **Goal:** Improve retrieval precision. Add metadata-driven filtering, optional
 re-ranking, and deduplication on re-ingest.
@@ -355,9 +470,9 @@ config. `pytest` green. `mypy --strict` passes.
 
 ---
 
-## Phase 5 — Distribution
+## Phase 6 — Distribution
 
-**Entry condition:** Phase 4 exit condition met.
+**Entry condition:** Phase 5 exit condition met.
 
 **Goal:** AgentRAG is installable from PyPI. A new user can go from zero to a
 running MCP server in under 60 seconds.
