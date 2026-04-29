@@ -1,5 +1,7 @@
 # Phase 1 — Core Ingestion Pipeline: Execution Plan
 
+> **Status: COMPLETE — 2026-04-29.** All 11 groups delivered and verified. `scripts/verify_phase1.sh` exits 0. CI green on `main`.
+
 Task groups mirror the roadmap step numbering. Each group breaks the step into
 the minimum executable sub-steps following strict TDD order: test file written
 and confirmed **failing** before any implementation file is created.

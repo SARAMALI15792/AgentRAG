@@ -1,4 +1,4 @@
-yes# Tech Stack
+# Tech Stack
 
 All library choices are locked unless a change is approved through the normal
 file-operation protocol (Article IV of the constitution). Adding a new
@@ -11,15 +11,15 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Layer | Library / Tool | Version | Rationale |
 |---|---|---|---|
 | Language | Python | 3.12+ | Structural pattern matching, `tomllib`, typing improvements. Minimum enforced in `pyproject.toml`. |
-| MCP server | `mcp` (official Python SDK) | ≥1.0, pin exact version in `pyproject.toml` | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. |
+| MCP server | `mcp` (official Python SDK) | ==1.27.0 (pinned exact) | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. |
 | HTTP server | FastAPI | 0.136.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
 | ASGI server | Uvicorn | 0.46.x | Production-grade ASGI runner for FastAPI. |
 | Vector store | `qdrant-client` | 1.17.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
 | Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). The chunker must tokenize using the same model's `AutoTokenizer` (bundled with `transformers`, already a transitive dependency of `sentence-transformers`) so chunk token counts exactly match what the embedder sees. Do not use character counts or `tiktoken` for chunk sizing. |
 | LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Not used in Phase 1–2. Reserved for future auxiliary tasks (e.g., query expansion, re-ranking via local LLM). Do not add any Ollama calls until a roadmap phase explicitly requires it. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
-| DOCX parsing | `python-docx` | 1.1.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
-| HTML parsing | `beautifulsoup4` | 4.12.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
+| DOCX parsing | `python-docx` | 1.1.x | Phase 4. Listed here for planning. Do not add until Phase 4 begins. |
+| HTML parsing | `beautifulsoup4` | 4.12.x | Phase 4. Listed here for planning. Do not add until Phase 4 begins. |
 | Settings | `pydantic-settings` | 2.x | Typed settings from env vars and `.env` files. Powers `src/agentrag/config.py`. |
 | CLI | `typer` | 0.12.x | Builds `agentrag serve` and `agentrag ingest` CLI commands from type-annotated functions. |
 

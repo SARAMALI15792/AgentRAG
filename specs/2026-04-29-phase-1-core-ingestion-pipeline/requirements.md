@@ -165,23 +165,17 @@ It contains no chunking, embedding, or retrieval logic.
 
 These are not yet resolved and will surface during implementation.
 
-### Windows path handling in tests
+### ~~Windows path handling in tests~~ — RESOLVED 2026-04-29
 
-The `source_id` is computed from `path.resolve()`. On Windows, `Path.resolve()`
-produces Windows-style absolute paths (`C:\Users\...`). Tests using `tmp_path`
-(pytest's platform-aware fixture) will produce the correct platform path
-automatically, so `source_id` computation should be correct without special
-handling. However, this has not been verified in integration tests — flag if
-`source_id` collisions or path mismatches occur.
+`path.resolve()` on Windows (`tmp_path`-based paths) produces correct
+`source_id` values. No special handling needed. Integration tests confirmed
+no collisions or mismatches.
 
-### PDF fixture generation
+### ~~PDF fixture generation~~ — RESOLVED 2026-04-29
 
-`tests/fixtures/sample.pdf` must be committed as a binary file. It is produced
-once via a helper script (not committed). If the PDF needs to be regenerated
-(e.g., after a pymupdf version change that breaks compatibility), the process
-is: generate with the helper script, commit the binary, never auto-regenerate
-in CI. Decision open: should the helper script be committed to `scripts/`?
-Recommend yes, for reproducibility — but mark it `# not run in CI`.
+`scripts/create_sample_pdf.py` committed to `scripts/` and marked
+`# not run in CI`. Binary fixture committed as `tests/fixtures/sample.pdf`.
+Regeneration process: run the script locally, commit the binary.
 
 ### Qdrant embedded mode persistence path
 
