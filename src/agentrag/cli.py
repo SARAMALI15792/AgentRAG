@@ -28,11 +28,11 @@ def ingest_cmd(file: Path) -> None:
 
     if result.status == "ok":
         typer.echo(
-            f"✓ Ingested {result.filename}: {result.chunk_count} chunks "
+            f"[OK] Ingested {result.filename}: {result.chunk_count} chunks "
             f"(source_id: {result.source_id})"
         )
     else:
-        typer.echo(f"✗ Ingestion failed: {result.error}", err=True)
+        typer.echo(f"[ERROR] Ingestion failed: {result.error}", err=True)
         raise typer.Exit(code=1)
 
 
