@@ -206,7 +206,7 @@ and in `pyproject.toml`.
 The canonical pre-commit verification command is:
 
 ```bash
-black . && ruff check . && mypy src/
+uv run black . && uv run ruff check . && uv run mypy src/
 ```
 
 This command must pass with zero errors, zero warnings, and zero type
@@ -293,6 +293,17 @@ Additional testing rules:
   documented and approved.
 - Coverage is measured but not gated to a specific percentage. Coverage reports
   exist to reveal gaps — not to gamify metric achievement.
+- **TYPE_CHECKING guard for test fixtures.** `tests/conftest.py` uses
+  `if TYPE_CHECKING:` blocks for all imports of `agentrag.*` types. At
+  runtime, these types are imported inside the fixture function body (deferred
+  import). This pattern prevents import-time circular dependency errors during
+  pytest collection. All future conftest additions must follow this pattern.
+- **`numpy` must be an explicit dev dependency.** Test fixtures use
+  `numpy` directly (e.g., `np.zeros` for deterministic mock vectors). Do not
+  rely on `numpy` being a transitive dependency of `sentence-transformers` —
+  declare it explicitly in `pyproject.toml` under `[project.optional-dependencies]`
+  `dev`. If `numpy` is missing from dev deps, add it before writing any test
+  fixture that constructs vectors.
 
 ### III.5 Commit Convention
 
@@ -318,7 +329,36 @@ Rules:
   fails, investigate and fix the underlying issue — do not bypass it.
 - Amending published commits is not permitted. Create a new commit.
 
-### III.6 Post-Implementation Code Review — Mandatory
+### III.6 Development Package Manager — `uv`
+
+This project uses `uv` as the sole development package manager. All tool
+invocations during development and CI must go through `uv`.
+
+| Operation | Command |
+|-----------|---------|
+| Install all deps (incl. dev) | `uv pip install -e ".[dev]"` |
+| Run any tool | `uv run <tool> <args>` |
+| Run tests | `uv run pytest --tb=short` |
+| Run formatter | `uv run black .` |
+| Run linter | `uv run ruff check .` |
+| Run type checker | `uv run mypy --strict src/` |
+| Create venv | `uv venv` |
+
+Rules:
+- Never invoke `pip install` directly — always `uv pip install`.
+- Never invoke `python -m pytest` or bare `pytest` — always `uv run pytest`.
+- The pre-commit hook detects the `.venv` directory and calls tools via the
+  venv's `Scripts/` (Windows) or `bin/` (Unix) path directly — this is
+  correct and must not be changed.
+- `uv.lock` is committed and must be kept in sync with `pyproject.toml`.
+  Run `uv lock` after any dependency change.
+
+**Why this is in the constitution:**
+`uv` is 10–100× faster than `pip` and produces reproducible installs via
+`uv.lock`. Using bare `pip` or `python -m` bypasses the lock file and risks
+subtle version divergence between local and CI environments.
+
+### III.7 Post-Implementation Code Review — Mandatory
 
 After writing any implementation code that will be committed, Claude must
 invoke the `coderabbit:code-review` skill before staging or committing.
@@ -326,7 +366,7 @@ invoke the `coderabbit:code-review` skill before staging or committing.
 **Protocol:**
 
 1. Complete the implementation and ensure `pytest` is green (Article III.4).
-2. Run `black . && ruff check . && mypy src/` and fix all issues.
+2. Run `uv run black . && uv run ruff check . && uv run mypy --strict src/` and fix all issues.
 3. Invoke the `coderabbit:code-review` skill on the changed files.
 4. Resolve all **blocking** issues (bugs, logic errors, security, broken
    contracts) before committing. No exceptions.
@@ -511,6 +551,26 @@ The `specs/` directory is governed by additional rules beyond those above:
   it actively misleads. Accuracy in `specs/` is a higher priority than
   completeness.
 
+**Phase execution subdirectories.** Each phase gets a dedicated subdirectory
+in `specs/` created at the start of the phase's replan session:
+
+```
+specs/{YYYY-MM-DD}-{phase-slug}/
+  plan.md         — step-by-step execution plan (what to do, in order)
+  requirements.md — locked acceptance criteria per deliverable group
+  validation.md   — exit gate checklist (what must be true before phase closes)
+```
+
+Rules:
+- The subdirectory name uses the ISO date the replan session started and a
+  kebab-case slug matching the phase name (e.g., `2026-04-29-phase-1-core-ingestion-pipeline`).
+- These files are created by Claude during the replan session, before any
+  implementation begins.
+- They are immutable during implementation — changes require user approval.
+- They are the authoritative record of what was agreed for that phase. If
+  `specs/roadmap.md` and a phase subdirectory conflict, the phase subdirectory
+  governs for the duration of that phase.
+
 ---
 
 ## Article VI — Project Specifications
@@ -683,24 +743,38 @@ then report the commit URL so the user can verify.
 
 Every push follows this exact sequence:
 
-1. **Verify** — run `black . && ruff check . && mypy src/` (if source files
-   were modified). A push with failing checks is a constitutional violation.
+1. **Verify** — run `uv run black . && uv run ruff check . && uv run mypy --strict src/`
+   (if source files were modified). A push with failing checks is a constitutional violation.
 2. **Stage** — add only the files relevant to the completed unit of work.
    Do not use `git add -A` blindly. Stage files explicitly by path.
 3. **Commit** — write a Conventional Commits message (Article III.5).
    Subject ≤ 50 characters. Body only if the why is non-obvious.
-4. **Push** — `git push origin main`. Confirm the push succeeded before
+4. **Push** — `git push origin HEAD`. Confirm the push succeeded before
    reporting the task as complete.
 5. **Report** — include the GitHub commit URL or a confirmation that the
    push succeeded in the response to the user.
 
 ### IX.4 Branch Strategy
 
-- All work in the current phase is committed directly to `main`.
-- Feature branches are introduced only when the project reaches Phase 3 or
-  when the user explicitly requests branch-based development.
-- Force-pushing to `main` is forbidden under all circumstances.
+This project uses three branch types. All are pushed to the remote and merge
+to `main` via pull request.
+
+| Branch type | Naming pattern | Purpose |
+|-------------|---------------|---------|
+| Phase implementation | `phase/{n}-{slug}` | All implementation commits for a single roadmap phase (e.g., `phase/2-mcp-server`) |
+| Replan | `replan/{slug}` | CLAUDE.md + spec amendments between phases (e.g., `replan/projectreplan`) |
+| Hotfix | `fix/{slug}` | Urgent bug corrections to a shipped phase |
+
+Rules:
+- **Never commit implementation directly to `main`.** All work goes through a
+  branch and a pull request. `main` is always in a green, releasable state.
+- One phase = one branch. Open the branch at the start of the phase's replan
+  session. Close it (merge PR) when the phase exit condition is met.
+- Replan branches are short-lived — open, amend specs/CLAUDE.md, merge.
+  No implementation code may land on a replan branch.
+- Force-pushing to any branch is forbidden under all circumstances.
 - Amending a pushed commit is forbidden. Create a new commit instead.
+- CI triggers on `main` and any `phase/*` or `replan/*` branch.
 
 ### IX.5 Git Configuration
 
@@ -732,7 +806,7 @@ verify:
 - [ ] No ingestion logic appears in `retrieval/` or vice versa (Article IV.1).
 - [ ] No new dependency was added without appearing in `specs/tech-stack.md` (Article IV.3).
 - [ ] No human-written code entered the codebase (Article VIII).
-- [ ] `coderabbit:code-review` run and all blocking issues resolved (Article III.6).
+- [ ] `coderabbit:code-review` run and all blocking issues resolved (Article III.7).
 - [ ] Changes committed and pushed to `github.com/SARAMALI15792/AgentRAG` (Article IX).
 
 ### X.2 Violations

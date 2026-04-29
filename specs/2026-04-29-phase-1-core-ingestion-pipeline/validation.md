@@ -1,5 +1,7 @@
 # Phase 1 — Core Ingestion Pipeline: Validation Criteria
 
+> **Status: ALL CONDITIONS PASSED — 2026-04-29.** Phase exit gate met. Phase 2 may begin.
+
 One acceptance condition per plan group, plus the binding phase exit gate.
 A group is not complete until its acceptance condition is met — not before.
 The phase is not complete until the Phase Exit Gate section passes in full.
