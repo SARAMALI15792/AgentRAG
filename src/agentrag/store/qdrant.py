@@ -149,9 +149,7 @@ class QdrantStore:
             offset = next_offset
         return list(sources.values())
 
-    def get_full_document(
-        self, source_id: str
-    ) -> tuple[str, str, str, dict[str, Any]]:
+    def get_full_document(self, source_id: str) -> tuple[str, str, str, dict[str, Any]]:
         """Retrieve all chunks for source_id and return assembled document."""
         # Query all chunks for this source_id
         results = self.query(
