@@ -88,26 +88,13 @@ def get_document(source_id: str) -> DocumentContent:
     settings = Settings()
     store = QdrantStore(settings)
 
-    # Query all chunks for this source_id, sorted by chunk_id (which includes index)
-    results = store.query(
-        vector=[0.0] * settings.vector_dim,  # dummy vector — we filter by source_id
-        top_k=10000,  # large limit to get all chunks
-        filters={"source_id": source_id},
-    )
-
-    if not results:
-        raise ValueError(f"source_id {source_id!r} not found")
-
-    # Sort by chunk_id to preserve order (chunk_id format: "{source_id}_{index}")
-    results.sort(key=lambda r: r.chunk_id)
-
-    full_text = "".join(r.text for r in results)
+    filename, full_text, source_id, metadata = store.get_full_document(source_id)
 
     return DocumentContent(
         source_id=source_id,
-        filename=results[0].filename,
+        filename=filename,
         full_text=full_text,
-        metadata=results[0].metadata,
+        metadata=metadata,
     )
 
 

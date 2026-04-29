@@ -162,25 +162,13 @@ def test_list_sources_delegates_to_store(mock_store: MagicMock) -> None:
 
 
 def test_get_document_delegates_to_store(mock_store: MagicMock) -> None:
-    """get_document delegates to store and reconstructs full text."""
-    mock_store.query.return_value = [
-        SearchResult(
-            chunk_id="abc_0",
-            source_id="abc",
-            filename="test.txt",
-            text="First chunk. ",
-            score=1.0,
-            metadata={},
-        ),
-        SearchResult(
-            chunk_id="abc_1",
-            source_id="abc",
-            filename="test.txt",
-            text="Second chunk.",
-            score=1.0,
-            metadata={},
-        ),
-    ]
+    """get_document delegates to store.get_full_document."""
+    mock_store.get_full_document.return_value = (
+        "test.txt",
+        "First chunk. Second chunk.",
+        "abc",
+        {},
+    )
 
     with patch("agentrag.server.tools.QdrantStore", return_value=mock_store):
         result = get_document(source_id="abc")
@@ -188,11 +176,14 @@ def test_get_document_delegates_to_store(mock_store: MagicMock) -> None:
     assert result.source_id == "abc"
     assert result.filename == "test.txt"
     assert result.full_text == "First chunk. Second chunk."
+    mock_store.get_full_document.assert_called_once_with("abc")
 
 
 def test_get_document_unknown_source_raises_valueerror(mock_store: MagicMock) -> None:
     """get_document with unknown source_id raises ValueError."""
-    mock_store.query.return_value = []
+    mock_store.get_full_document.side_effect = ValueError(
+        "source_id 'unknown' not found"
+    )
 
     with patch("agentrag.server.tools.QdrantStore", return_value=mock_store):
         with pytest.raises(ValueError, match="source_id 'unknown' not found"):
