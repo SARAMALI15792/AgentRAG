@@ -88,7 +88,7 @@ All configuration is loaded via `pydantic-settings` from environment or `.env`:
 | Variable | Default | Description |
 |---|---|---|
 | `AGENTRAG_DATA_DIR` | `~/.agentrag` | Root directory for Qdrant data and config |
-| `AGENTRAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model name |
+| `AGENTRAG_EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | sentence-transformers model name. Must use the full `{org}/{model}` HuggingFace path — the short name fails HuggingFace auth. |
 | `AGENTRAG_VECTOR_DIM` | `384` | Output dimension of the embedding model. Must match the Qdrant collection `vector_size`. If the embed model is changed, this value must be updated and the Qdrant collection recreated. |
 | `AGENTRAG_CHUNK_SIZE` | `512` | Token chunk size for splitting |
 | `AGENTRAG_CHUNK_OVERLAP` | `64` | Token overlap between chunks |
