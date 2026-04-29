@@ -241,23 +241,29 @@ tool. The following rules are absolute:
 
 ### III.3 Comment and Documentation Policy
 
-Comments exist to explain **why** something is done — never **what** it does.
-Well-named identifiers, types, and structure communicate the what. A comment
-that restates the code in English is noise and will be removed during review.
+Comments and docstrings are allowed and encouraged when they add genuine
+clarity. They must be **short and precise** — one line maximum per comment,
+one-line summary for docstrings. Verbosity is the only violation.
 
 Rules:
 
-- **Write no comment** unless the reasoning would genuinely surprise a
-  competent reader who did not write the code.
-- **Docstrings** on public interfaces: one-line summary sentence only.
-  No parameter lists repeated in prose. No multi-paragraph explanations.
-  If a function needs a paragraph to explain, the function needs refactoring.
+- **Docstrings** on every public and private function, method, and class:
+  one-line summary sentence only. No parameter lists repeated in prose.
+  No multi-paragraph explanations. If a function needs more than one sentence
+  to describe, the function needs refactoring.
+- **Inline comments** are permitted on any line or block where the intent is
+  not immediately obvious from the code alone. Keep them short and precise —
+  one line, no trailing essays. Both WHAT and WHY are valid subjects when
+  the name alone leaves ambiguity.
 - **No task-tracking in source comments.** Comments like "added for issue #42",
   "TODO: fix this later", "used by the ingest flow" are forbidden. That
   information belongs in commit messages, PR descriptions, and issue trackers —
   not in source files that outlive the context they were written in.
 - **No commented-out code.** If code is removed, it is removed. Git preserves
   history. Commented-out code is archaeology that rots in place.
+- **No multi-line comment blocks.** If a concept requires a paragraph, it
+  belongs in the spec or a PR description — not in source. One line per
+  comment. No exceptions.
 
 ### III.4 Testing Discipline — Test-Driven Development
 
