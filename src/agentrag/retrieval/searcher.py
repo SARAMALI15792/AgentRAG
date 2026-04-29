@@ -1,0 +1,35 @@
+"""Searcher — semantic search over the Qdrant vector store."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sentence_transformers import SentenceTransformer
+
+from agentrag.config import Settings
+from agentrag.store.qdrant import QdrantStore
+from agentrag.types import SearchResult
+
+
+def search(
+    query: str,
+    top_k: int,
+    settings: Settings,
+    filters: dict[str, Any] | None = None,
+) -> list[SearchResult]:
+    """Embed query and return top_k results ranked by cosine similarity."""
+    # Embed query using same model as ingestion
+    model = SentenceTransformer(settings.embed_model)
+    vectors = model.encode([query])
+    # Handle both numpy array (real) and list (mock) return types
+    if hasattr(vectors[0], "tolist"):
+        query_vector = vectors[0].tolist()
+    else:
+        query_vector = vectors[0]
+
+    # Query store
+    store = QdrantStore(settings)
+    results = store.query(vector=query_vector, top_k=top_k, filters=filters)
+
+    # Results already sorted by score descending from store.query
+    return results

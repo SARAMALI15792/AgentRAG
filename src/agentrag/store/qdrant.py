@@ -149,6 +149,25 @@ class QdrantStore:
             offset = next_offset
         return list(sources.values())
 
+    def get_full_document(self, source_id: str) -> tuple[str, str, str, dict[str, Any]]:
+        """Retrieve all chunks for source_id and return assembled document."""
+        # Query all chunks for this source_id
+        results = self.query(
+            vector=[0.0] * self._vector_dim,  # dummy vector — filter by source_id
+            top_k=10000,  # large limit to get all chunks
+            filters={"source_id": source_id},
+        )
+
+        if not results:
+            raise ValueError(f"source_id {source_id!r} not found")
+
+        # Sort by chunk_id to preserve order (chunk_id format: "{source_id}_{index}")
+        results.sort(key=lambda r: r.chunk_id)
+
+        full_text = "".join(r.text for r in results)
+
+        return results[0].filename, full_text, source_id, results[0].metadata
+
     def _delete_by_source(self, source_id: str) -> None:
         """Remove all Qdrant points whose payload source_id matches."""
         self._client.delete(
