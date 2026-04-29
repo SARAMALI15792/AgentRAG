@@ -17,7 +17,7 @@ def test_default_values_load(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     from agentrag.config import Settings
 
     s = Settings(data_dir=tmp_path / "defaults")
-    assert s.embed_model == "all-MiniLM-L6-v2"
+    assert s.embed_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert s.chunk_size == 512
     assert s.chunk_overlap == 64
     assert s.vector_dim == 384
