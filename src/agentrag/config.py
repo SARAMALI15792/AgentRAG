@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # Core paths and model
     data_dir: Path = Path.home() / ".agentrag"
-    embed_model: str = "all-MiniLM-L6-v2"
+    embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     vector_dim: int = 384  # must match embed_model output dimension
 
     # Chunking
