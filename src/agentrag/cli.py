@@ -6,9 +6,11 @@ import logging
 from pathlib import Path
 
 import typer
+import uvicorn
 
 from agentrag.config import Settings
 from agentrag.ingestion.pipeline import ingest
+from agentrag.server.app import create_app
 from agentrag.store.qdrant import QdrantStore
 
 app = typer.Typer(help="AgentRAG — Agentic RAG MCP Server")
@@ -53,6 +55,26 @@ def list_cmd() -> None:
             f"  {source.filename} ({source.chunk_count} chunks) — {source.source_id}"
         )
         typer.echo(f"    Ingested: {source.ingested_at}")
+
+
+@app.command(name="serve")
+def serve_cmd(
+    transport: str = typer.Option("stdio", help="Transport mode: stdio or http"),
+    port: int = typer.Option(8000, help="HTTP port (ignored for stdio)"),
+    host: str = typer.Option("127.0.0.1", help="HTTP host (ignored for stdio)"),
+) -> None:
+    """Start the MCP server."""
+    fastapi_app, mcp = create_app()
+
+    if transport == "stdio":
+        typer.echo("Starting MCP server in stdio mode...")
+        mcp.run(transport="stdio")
+    elif transport == "http":
+        typer.echo(f"Starting MCP server on http://{host}:{port}")
+        uvicorn.run(fastapi_app, host=host, port=port)
+    else:
+        typer.echo(f"[ERROR] Unknown transport: {transport}", err=True)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
