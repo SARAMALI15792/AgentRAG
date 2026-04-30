@@ -80,7 +80,7 @@ Claude can decompose a complex question into sub-queries, search each
 independently, evaluate whether the results actually answer the question, and
 decide whether to re-search — all through tool calls, without special prompting.
 
-**Dependency:** Requires Ollama running locally. Graceful degradation if unavailable.
+**Dependency:** Requires `AGENTRAG_GOOGLE_API_KEY` env var (free Google AI Studio key). Graceful degradation if key missing or API unreachable.
 
 ### Deliverables
 
@@ -119,15 +119,15 @@ class EvaluationReport:
 **Step 2 — Query planner**
 
 - [ ] `tests/unit/test_query_planner.py` ← write first, confirm red
-      (Ollama is mocked — no live model in unit tests)
+      (Gemini client is mocked — no live API calls in unit tests)
       - simple query → `QueryPlan` with `sub_queries = [original_query]`
       - compound query ("compare X and Y") → `sub_queries` has ≥ 2 items
-      - Ollama unavailable → degrades gracefully, returns single-item plan
+      - API key missing or Gemini unavailable → degrades gracefully, returns single-item plan
       - `original_query` always preserved in output
 - [ ] `src/agentrag/retrieval/query_planner.py` ← implement to make tests green
-      Calls Ollama HTTP API (`AGENTRAG_OLLAMA_URL`) to decompose the query.
+      Calls Gemini 2.0 Flash via `google-genai` SDK (`AGENTRAG_GOOGLE_API_KEY`).
       Prompt instructs the model to return a JSON list of sub-questions.
-      Graceful degradation: if Ollama is unreachable or returns invalid JSON,
+      Graceful degradation: if API key missing, quota exceeded, or response is invalid JSON,
       returns `QueryPlan(original_query, sub_queries=[original_query])`.
 
 ---
@@ -135,14 +135,14 @@ class EvaluationReport:
 **Step 3 — Chunk evaluator**
 
 - [ ] `tests/unit/test_evaluator.py` ← write first, confirm red
-      (Ollama mocked — no live model in unit tests)
+      (Gemini client mocked — no live API calls in unit tests)
       - all chunks score ≥ 0.7 → `sufficient = True`
       - all chunks score < 0.7 → `sufficient = False`, `suggested_queries` non-empty
       - empty chunk list → `sufficient = False`
       - each `ChunkScore.score` is in `[0.0, 1.0]`
 - [ ] `src/agentrag/retrieval/evaluator.py` ← implement to make tests green
-      Calls Ollama to score each chunk's relevance to the query.
-      Graceful degradation: if Ollama unavailable, scores all chunks at `0.5`
+      Calls Gemini 2.0 Flash to score each chunk's relevance to the query.
+      Graceful degradation: if API key missing or Gemini unavailable, scores all chunks at `0.5`
       and sets `sufficient = True` (pass-through — does not block retrieval).
 
 ---
@@ -169,40 +169,20 @@ class EvaluationReport:
 
 **Step 5 — Integration**
 
-- [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Ollama optional:
+- [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Gemini optional:
       - ingest `sample.txt`, call `plan_query` → verify sub-queries are strings
       - call `search_multi` with 2 queries → result count ≤ `top_k`, no duplicates
       - call `evaluate_chunks` on results → `EvaluationReport` returned without error
       - full loop: `plan_query` → `search_multi` → `evaluate_chunks` → if not
         sufficient → `search_multi` with `suggested_queries` → verify second pass
         returns results
-      - Ollama absent: all three tools complete without raising (graceful degrade)
+      - `AGENTRAG_GOOGLE_API_KEY` absent: all three tools complete without raising (graceful degrade)
 
 ---
 
 **Exit condition:** `search_multi`, `evaluate_chunks`, and `plan_query` are
-callable from Claude Desktop. Full agentic loop test passes. Ollama degradation
+callable from Claude Desktop. Full agentic loop test passes. Gemini graceful-degrade
 verified. `pytest` green. `mypy --strict` passes.
-
----
-
-## Phase 4 — Extended File Support
-
-**Entry condition:** Phase 3 exit condition met.
-
-**Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
-`ingest_directory` to handle all supported types recursively.
-
-### Deliverables
-
-- [ ] `python-docx` added to dependencies (with approval)
-- [ ] `beautifulsoup4` added to dependencies (with approval)
-- [ ] `reader.py` extended: `.docx`, `.html`, `.py`, `.ipynb` readers
-- [ ] `ingest_directory` tool: recursive glob, per-extension filtering
-- [ ] `tests/unit/` — new reader tests for each file type
-- [ ] Update `specs/tech-stack.md` to move Phase 4 libs from "planned" to "active"
-
-**Exit condition:** `agentrag ingest ./my-repo/` recursively ingests a mixed codebase. `pytest` green.
 
 ---
 

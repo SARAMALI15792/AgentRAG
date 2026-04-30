@@ -30,7 +30,7 @@ exactly what Phase 1 is, what has already been decided, and what is still open.
 - Re-ranking — Phase 5
 - PyPI distribution — Phase 6
 - URL ingestion, multi-user support, cloud backend — non-goals, not in any phase
-- Any Ollama calls — not until Phase 3
+- Any Gemini/google-genai calls — not until Phase 4
 
 ---
 

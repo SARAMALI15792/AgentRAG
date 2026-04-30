@@ -22,7 +22,7 @@ conflict on any point, this file is authoritative for the duration of Phase 2.
 ### Out of Scope
 
 - No cross-encoder re-ranking (Phase 5)
-- No Ollama integration (Phase 3)
+- No Gemini integration (Phase 4)
 - No `.docx`, `.html`, `.py`, `.ipynb` ingestion (Phase 4) — `ingest_directory`
   supports Phase 1 file types only (`.pdf`, `.md`, `.txt`)
 - No authentication, rate limiting, or multi-user support

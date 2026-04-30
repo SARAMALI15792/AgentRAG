@@ -16,7 +16,7 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | ASGI server | Uvicorn | 0.46.x | Production-grade ASGI runner for FastAPI. |
 | Vector store | `qdrant-client` | 1.17.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
 | Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). The chunker must tokenize using the same model's `AutoTokenizer` (bundled with `transformers`, already a transitive dependency of `sentence-transformers`) so chunk token counts exactly match what the embedder sees. Do not use character counts or `tiktoken` for chunk sizing. |
-| LLM (local) | Ollama (via HTTP) | latest | Local LLM runtime. Not used in Phase 1–2. Reserved for future auxiliary tasks (e.g., query expansion, re-ranking via local LLM). Do not add any Ollama calls until a roadmap phase explicitly requires it. |
+| LLM (cloud) | `google-genai` (Gemini API) | 1.x | Google Gemini 2.0 Flash via the official `google-genai` Python SDK. Free tier, generous quota, no local setup. Used for query decomposition and chunk evaluation in Phase 4. Do not add any Gemini calls until Phase 4 begins. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
 | DOCX parsing | `python-docx` | 1.1.x | Phase 4. Listed here for planning. Do not add until Phase 4 begins. |
 | HTML parsing | `beautifulsoup4` | 4.12.x | Phase 4. Listed here for planning. Do not add until Phase 4 begins. |
@@ -95,6 +95,6 @@ All configuration is loaded via `pydantic-settings` from environment or `.env`:
 | `AGENTRAG_PORT` | `8000` | HTTP port when using HTTP transport |
 | `AGENTRAG_TRANSPORT` | `stdio` | `stdio` or `http` |
 | `AGENTRAG_RERANK` | `false` | Set to `true` to activate cross-encoder re-ranking (Phase 5+). Identity reranker is used when `false`. |
-| `AGENTRAG_OLLAMA_URL` | `http://localhost:11434` | Ollama HTTP endpoint used by `query_planner.py` and `evaluator.py` (Phase 3+). If unreachable, both modules degrade gracefully — retrieval is never blocked. |
-| `AGENTRAG_OLLAMA_MODEL` | `llama3.2` | Ollama model for query decomposition and chunk evaluation. Any model served by the local Ollama instance is valid. |
-| `AGENTRAG_QUERY_EXPAND` | `false` | Set to `true` to enable Ollama-backed query expansion in `plan_query`. When `false`, `plan_query` returns the original query unchanged without calling Ollama. |
+| `AGENTRAG_GOOGLE_API_KEY` | _(required for Phase 4)_ | Google Gemini API key. Obtain free from https://aistudio.google.com/. Used by `query_planner.py` and `evaluator.py`. If missing or invalid, both modules degrade gracefully — retrieval is never blocked. |
+| `AGENTRAG_GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model name for query decomposition and chunk evaluation. Any model available on the free tier is valid. |
+| `AGENTRAG_QUERY_EXPAND` | `false` | Set to `true` to enable Gemini-backed query expansion in `plan_query`. When `false`, `plan_query` returns the original query unchanged without calling Gemini. |
