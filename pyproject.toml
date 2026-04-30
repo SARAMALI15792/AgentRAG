@@ -31,6 +31,7 @@ dev = [
     "httpx>=0.27.0",
     "hatchling",
     "numpy>=1.26",
+    "types-beautifulsoup4",
 ]
 
 [project.scripts]

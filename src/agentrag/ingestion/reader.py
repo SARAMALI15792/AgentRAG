@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import pymupdf
+from bs4 import BeautifulSoup
+from docx import Document
 
 from agentrag.types import RawDocument
 
 logger = logging.getLogger(__name__)
+
+_SUPPORTED = {".pdf", ".txt", ".md", ".docx", ".html", ".py", ".ipynb"}
 
 
 def read_file(path: Path) -> RawDocument:
@@ -19,16 +25,20 @@ def read_file(path: Path) -> RawDocument:
         raise FileNotFoundError(f"File not found: {path}")
 
     suffix = path.suffix.lower()
-    if suffix not in {".pdf", ".txt", ".md"}:
+    if suffix not in _SUPPORTED:
         raise ValueError(f"Unsupported file type: {suffix}")
 
-    # Compute stable source_id from resolved absolute path
     source_id = hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:16]
 
-    # Extract text based on file type
     if suffix == ".pdf":
         text = _read_pdf(path)
-    else:  # .txt or .md
+    elif suffix == ".docx":
+        text = _read_docx(path)
+    elif suffix == ".html":
+        text = _read_html(path)
+    elif suffix == ".ipynb":
+        text = _read_ipynb(path)
+    else:  # .txt, .md, .py
         text = path.read_text(encoding="utf-8")
 
     if not text.strip():
@@ -48,3 +58,30 @@ def _read_pdf(path: Path) -> str:
     pages = [page.get_text() for page in doc]  # type: ignore[attr-defined]
     doc.close()  # type: ignore[no-untyped-call]
     return "\n".join(pages)
+
+
+def _read_docx(path: Path) -> str:
+    """Extract paragraph text from a Word document, skipping blank paragraphs."""
+    doc = Document(str(path))
+    lines: list[str] = [str(p.text) for p in doc.paragraphs if p.text.strip()]
+    return "\n".join(lines)
+
+
+def _read_html(path: Path) -> str:
+    """Extract body text from HTML, removing nav/header/footer/script/style."""
+    html = path.read_text(encoding="utf-8")
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all(["nav", "header", "footer", "script", "style"]):
+        tag.decompose()
+    return soup.get_text(separator="\n")
+
+
+def _read_ipynb(path: Path) -> str:
+    """Extract source text from code and markdown cells; skip raw cells."""
+    nb: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    parts: list[str] = []
+    for cell in nb.get("cells", []):
+        if cell.get("cell_type") in {"code", "markdown"}:
+            source = cell.get("source", [])
+            parts.append("".join(source))
+    return "\n\n".join(parts)
