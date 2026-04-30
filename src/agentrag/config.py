@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     query_expand: bool = False
+    collection: str = "documents"
+    ingest_timeout: int = 300
+    max_file_size_mb: int = 100
 
     def model_post_init(self, __context: Any) -> None:
         """Create data_dir on disk if it does not already exist."""

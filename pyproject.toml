@@ -18,6 +18,8 @@ dependencies = [
     "beautifulsoup4>=4.12.0,<4.13.0",
     "pydantic-settings>=2.0,<3.0",
     "typer>=0.12.0",
+    "PyYAML>=6.0,<7.0",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +34,22 @@ dev = [
     "hatchling",
     "numpy>=1.26",
     "types-beautifulsoup4",
+]
+office = [
+    "openpyxl>=3.1.0,<3.2.0",
+    "python-pptx>=1.0.0,<2.0.0",
+]
+ebooks = [
+    "ebooklib>=0.18,<0.19",
+    "mobi>=0.3.0,<0.4.0",
+]
+web = [
+    "httpx>=0.27.0",
+    "pysrt>=1.1.0,<1.2.0",
+    "webvtt-py>=0.5.0,<0.6.0",
+]
+all = [
+    "agentrag[office,ebooks,web]",
 ]
 
 [project.scripts]
