@@ -57,22 +57,9 @@ def search_by_metadata(filters: dict[str, Any]) -> list[SourceInfo]:
     """Search sources by metadata filters."""
     if not filters:
         raise ValueError("filters must not be empty")
-
     settings = Settings()
     store = QdrantStore(settings)
-    # Filter list_sources results by matching metadata
-    all_sources = store.list_sources()
-
-    matched: list[SourceInfo] = []
-    for source in all_sources:
-        # Check if all filter key-value pairs match
-        if all(
-            source.metadata.get(k) == v or getattr(source, k, None) == v
-            for k, v in filters.items()
-        ):
-            matched.append(source)
-
-    return matched
+    return store.filter_sources(filters)
 
 
 def list_sources() -> list[SourceInfo]:

@@ -141,12 +141,22 @@ def test_search_documents_empty_query_raises_valueerror() -> None:
 
 
 def test_search_by_metadata_delegates_to_store(mock_store: MagicMock) -> None:
-    """search_by_metadata delegates to store.list_sources with filter."""
+    """search_by_metadata delegates to store.filter_sources."""
+    mock_store.filter_sources.return_value = [
+        SourceInfo(
+            source_id="abc",
+            filename="test.txt",
+            chunk_count=5,
+            metadata={},
+            ingested_at="2026-04-29T00:00:00Z",
+        )
+    ]
     with patch("agentrag.server.tools.QdrantStore", return_value=mock_store):
         results = search_by_metadata(filters={"filename": "test.txt"})
 
     assert len(results) == 1
     assert results[0].filename == "test.txt"
+    mock_store.filter_sources.assert_called_once_with({"filename": "test.txt"})
 
 
 def test_search_by_metadata_empty_filters_raises_valueerror() -> None:
