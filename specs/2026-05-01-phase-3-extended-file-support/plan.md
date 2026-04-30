@@ -1,288 +1,180 @@
 # Phase 3 — Extended File Support — Execution Plan
 
-Execution order is strict. Each step must complete before the next begins.
-Every implementation step is preceded by a failing test that specifies what
-the code must do. Tests prove the implementation — but the implementation is
-the deliverable.
+Steps are strict-order. Each must be fully complete before the next begins.
+For every implementation file written, a failing test is written first.
 
 ---
 
-## Step 0 — Context7 Lookups _(before any code)_
+## Step 0 — Context7 Lookups
 
-Look up current API docs for the two new libraries before writing a single line.
+Before any code, look up current documentation for the two new libraries.
 
-- [ ] Resolve Context7 library ID for `python-docx`
-- [ ] Query `python-docx` docs — topic: `"Document paragraph iteration text extraction"`
-- [ ] Resolve Context7 library ID for `beautifulsoup4`
-- [ ] Query `beautifulsoup4` docs — topic: `"decompose get_text tag removal html.parser"`
+- [ ] Resolve and query `python-docx`: Document class, paragraph iteration, text extraction
+- [ ] Resolve and query `beautifulsoup4`: tag decomposition, get_text, html.parser backend
 
 ---
 
 ## Step 1 — Dependencies
 
-Add two new runtime dependencies and lock them.
+Add `python-docx 1.1.x` and `beautifulsoup4 4.12.x` to `pyproject.toml` runtime
+dependencies. Run `uv lock`. Update `specs/tech-stack.md` to move both libraries
+from "Phase 3 planned" notes into the active runtime table.
 
-**What changes in `pyproject.toml`:**
-```toml
-[project.dependencies]
-# existing entries ...
-"python-docx>=1.1,<1.2",
-"beautifulsoup4>=4.12,<4.13",
-```
-
-**Steps:**
-- [ ] Obtain user approval for both additions (one AskUserQuestion call)
-- [ ] Add `python-docx>=1.1,<1.2` to `[project.dependencies]` in `pyproject.toml`
-- [ ] Add `beautifulsoup4>=4.12,<4.13` to `[project.dependencies]` in `pyproject.toml`
-- [ ] Run `uv lock` — verify `uv.lock` updates cleanly
-- [ ] Update `specs/tech-stack.md` runtime table: promote both from "Phase 3 planned" to active rows
-- [ ] Commit: `chore: add python-docx and beautifulsoup4 runtime dependencies`
+Commit: `chore: add python-docx and beautifulsoup4 runtime dependencies`
 
 ---
 
-## Step 2 — New Reader Helpers in `reader.py`
+## Step 2 — New File Type Readers
 
-### What we're building
+The only implementation file that changes is `src/agentrag/ingestion/reader.py`.
+The only test file that changes is `tests/unit/test_reader.py`.
 
-`src/agentrag/ingestion/reader.py` gets three new private helper functions and
-an extended dispatch block. The public function `read_file(path: Path) -> RawDocument`
-signature is **unchanged** — callers see no difference.
-
-**New imports added at top of `reader.py`:**
-```python
-import json
-from bs4 import BeautifulSoup
-from docx import Document
-```
-
-**Three new private helpers:**
-
-```python
-def _read_docx(path: Path) -> str:
-    """Extract paragraph text from a .docx file."""
-    doc = Document(path)
-    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-
-def _read_html(path: Path) -> str:
-    """Extract body text from HTML, stripping nav/header/footer/script/style."""
-    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-    for tag in soup.find_all(["nav", "header", "footer", "script", "style"]):
-        tag.decompose()
-    return soup.get_text(separator="\n", strip=True)
-
-def _read_ipynb(path: Path) -> str:
-    """Extract source text from code and markdown cells in a Jupyter notebook."""
-    nb = json.loads(path.read_text(encoding="utf-8"))
-    parts = [
-        "".join(cell["source"])
-        for cell in nb.get("cells", [])
-        if cell.get("cell_type") in {"code", "markdown"}
-    ]
-    return "\n\n".join(parts)
-```
-
-**Extended dispatch in `read_file()`:**
-
-The existing suffix check expands from `{".pdf", ".txt", ".md"}` to include
-the four new types. `.py` needs no new helper — it reuses the existing
-`path.read_text(encoding="utf-8")` branch:
-
-```python
-# Before (Phase 2):
-if suffix not in {".pdf", ".txt", ".md"}:
-    raise ValueError(...)
-if suffix == ".pdf":
-    text = _read_pdf(path)
-else:
-    text = path.read_text(encoding="utf-8")
-
-# After (Phase 3):
-if suffix not in {".pdf", ".txt", ".md", ".docx", ".html", ".py", ".ipynb"}:
-    raise ValueError(...)
-if suffix == ".pdf":
-    text = _read_pdf(path)
-elif suffix == ".docx":
-    text = _read_docx(path)
-elif suffix == ".html":
-    text = _read_html(path)
-elif suffix == ".ipynb":
-    text = _read_ipynb(path)
-else:  # .txt, .md, .py — raw text
-    text = path.read_text(encoding="utf-8")
-```
-
-### 2a — `.docx` (TDD sequence)
-
-- [ ] Write `test_read_docx` in `tests/unit/test_reader.py` — assert `RawDocument.text`
-      is non-empty, `filename` matches, `source_id` is 16-char hex
-- [ ] Run → confirm **red** (`.docx` branch doesn't exist yet)
-- [ ] Create `tests/fixtures/sample.docx` programmatically using `python-docx`:
-      3 paragraphs of real prose, one empty paragraph to verify filtering
-- [ ] Implement `_read_docx()` and add `.docx` branch to `read_file()`
-- [ ] Run → confirm **green**
-
-### 2b — `.html` (TDD sequence)
-
-- [ ] Write `test_read_html` in `tests/unit/test_reader.py` — assert no `<`/`>` chars,
-      nav/script/style sentinel strings absent, body content present
-- [ ] Run → confirm **red**
-- [ ] Create `tests/fixtures/sample.html`: contains `<nav>NAVTEXT</nav>`,
-      `<script>SCRIPTTEXT</script>`, `<style>STYLETEXT</style>`, `<header>HEADERTEXT</header>`,
-      `<footer>FOOTERTEXT</footer>`, and `<main><p>BODYTEXT paragraph one.</p></main>`
-      (sentinel strings make assertions unambiguous)
-- [ ] Implement `_read_html()` and add `.html` branch
-- [ ] Run → confirm **green**
-
-### 2c — `.py` (TDD sequence)
-
-- [ ] Write `test_read_py` in `tests/unit/test_reader.py` — assert `text` equals
-      exact raw source of fixture (no transformation whatsoever)
-- [ ] Run → confirm **red** (`.py` not in supported set yet)
-- [ ] Create `tests/fixtures/sample.py`: 3 functions with docstrings, ≥30 lines
-- [ ] Add `.py` to the supported suffix set in `read_file()` — no new helper needed,
-      falls through to the existing `path.read_text(encoding="utf-8")` branch
-- [ ] Run → confirm **green**
-
-### 2d — `.ipynb` (TDD sequence)
-
-- [ ] Write `test_read_ipynb` in `tests/unit/test_reader.py` — assert known code cell
-      string present in output, known markdown cell string present in output,
-      `cell_type=="raw"` content absent
-- [ ] Run → confirm **red**
-- [ ] Create `tests/fixtures/sample.ipynb`: valid JSON, 2 code cells + 2 markdown cells
-      + 1 raw cell with a unique sentinel string (to assert exclusion)
-- [ ] Implement `_read_ipynb()` and add `.ipynb` branch
-- [ ] Run → confirm **green**
-
-### 2e — Full reader suite
-
-- [ ] `uv run pytest tests/unit/test_reader.py` → all tests green (old + 4 new)
-- [ ] `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
-- [ ] Commit: `feat: extend reader with docx, html, py, ipynb support`
+For each file type below: write the test first, confirm it fails, create the
+fixture, write the implementation, confirm the test passes.
 
 ---
 
-## Step 3 — Extend `ingest_directory` in `tools.py`
+### `.docx`
 
-### What we're building
+**Implementation — `reader.py`:**
+Add a private helper that opens a `.docx` file, iterates its paragraphs, filters
+out empty ones, and joins the remaining text. Add `.docx` to the supported suffix
+set and route it to that helper in the dispatch block.
 
-One line changes in `src/agentrag/server/tools.py`. The `ingest_directory` handler's
-glob list expands from 3 to 7 extensions. No new logic, no new functions.
+**Test — `test_reader.py`:**
+Given a `.docx` fixture with known paragraphs and one intentionally empty paragraph,
+assert the returned `RawDocument` has non-empty text, the correct filename, a
+16-character hex source_id, and that the empty paragraph does not appear in the output.
 
-```python
-# Before (Phase 2):
-for ext in ["*.txt", "*.md", "*.pdf"]:
+**Fixture — `tests/fixtures/sample.docx`:**
+Three paragraphs of real prose plus one blank paragraph. Created programmatically
+using `python-docx` so it is a valid `.docx` binary.
 
-# After (Phase 3):
-for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
-```
+---
 
-The handler stays ≤15 lines (Article IV.1). The stale comment `# Phase 2: only ...`
-is removed — no task-tracking comments in source (Article III.3).
+### `.html`
 
-### TDD sequence
+**Implementation — `reader.py`:**
+Add a private helper that parses the HTML, removes the `nav`, `header`, `footer`,
+`script`, and `style` tags and all their contents, then extracts plain text.
+Add `.html` to the supported suffix set and route it to that helper.
 
-- [ ] Write `test_ingest_directory_all_types` in `tests/unit/test_tools.py`:
-      mock pipeline + a temp directory containing one file of each of 7 extensions,
-      assert `ingest()` called exactly 7 times (once per file, none skipped)
-- [ ] Run → confirm **red** (only 3 types currently globbed)
-- [ ] Update the glob list in `ingest_directory`; remove stale Phase 2 comment
-- [ ] Run → confirm **green**
-- [ ] `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
-- [ ] Commit: `feat: extend ingest_directory to support all 7 file types`
+**Test — `test_reader.py`:**
+Given an `.html` fixture containing known sentinel strings inside boilerplate tags
+and separate known content in the body, assert the returned `RawDocument` text
+contains the body content, does not contain any of the boilerplate sentinel strings,
+and contains no raw angle-bracket characters.
+
+**Fixture — `tests/fixtures/sample.html`:**
+A complete HTML page with `<nav>`, `<header>`, `<footer>`, `<script>`, and `<style>`
+elements each containing a unique sentinel string, and a `<main>` section with
+at least three paragraphs of body content. Sentinel strings make the assertions
+unambiguous and not dependent on counting characters.
+
+---
+
+### `.py`
+
+**Implementation — `reader.py`:**
+Add `.py` to the supported suffix set. No new helper is needed — `.py` files are
+read as raw UTF-8 text, the same path already used for `.txt` and `.md`.
+
+**Test — `test_reader.py`:**
+Given a `.py` fixture, assert that `RawDocument.text` is byte-for-byte identical
+to the raw file content — no transformation, stripping, or parsing applied.
+
+**Fixture — `tests/fixtures/sample.py`:**
+A plain Python source file with at least three functions, docstrings, and inline
+comments totalling at least 30 lines. Serves as both the unit test fixture and
+the integration test fixture.
+
+---
+
+### `.ipynb`
+
+**Implementation — `reader.py`:**
+Add a private helper that parses the notebook JSON, iterates its cells, collects
+the source text from `code` and `markdown` cell types, skips `raw` cells entirely,
+and joins the collected texts with a double newline separator. Add `.ipynb` to the
+supported suffix set and route it to that helper.
+
+**Test — `test_reader.py`:**
+Given an `.ipynb` fixture with known text in code cells, markdown cells, and one
+raw cell, assert that the code cell text is present in `RawDocument.text`, the
+markdown cell text is present, and the raw cell text is absent.
+
+**Fixture — `tests/fixtures/sample.ipynb`:**
+A valid notebook JSON with two code cells, two markdown cells, and one raw cell.
+Each cell contains a unique sentinel string to make assertions precise.
+
+---
+
+### Complete the reader step
+
+After all four types pass individually, run the full `test_reader.py` suite to
+confirm all old tests still pass alongside the four new ones. Run the full
+formatter, linter, and type-checker. Commit: `feat: extend reader with docx, html, py, ipynb support`
+
+---
+
+## Step 3 — Extend `ingest_directory`
+
+The only implementation change is in `src/agentrag/server/tools.py`: the glob
+list inside `ingest_directory` grows from three extensions to seven. The handler
+logic, line count, and public signature are unchanged.
+
+**Test — `test_tools.py`:**
+Add a test that creates a temporary directory with one file of each of the seven
+supported extensions, calls `ingest_directory` with the pipeline mocked, and
+asserts that `ingest` was called exactly once per file with no type silently skipped.
+Confirm this test fails before the glob list is extended, then passes after.
+
+Commit: `feat: extend ingest_directory to support all 7 file types`
 
 ---
 
 ## Step 4 — Integration Tests
 
-### What we're building
+Create `tests/integration/test_extended_ingestion.py`. These tests use a real
+embedded Qdrant instance and exercise the full pipeline for each new type.
 
-`tests/integration/test_extended_ingestion.py` — 5 tests against a real embedded
-Qdrant instance. These tests verify the full pipeline (reader → chunker → embedder →
-store) for each new type, not just the reader in isolation.
+Five tests, one per concern:
 
-**Test: `test_ingest_docx`**
-- Ingest `tests/fixtures/sample.docx` via `ingest(path, settings)`
-- Assert `IngestResult.status == "ok"`, `chunk_count > 0`
+- **`test_ingest_docx`** — ingest the `.docx` fixture end-to-end; assert the result
+  status is `ok` and at least one chunk was stored.
 
-**Test: `test_ingest_html`**
-- Ingest `tests/fixtures/sample.html`
-- Assert `chunk_count > 0`
-- Call `search_documents("BODYTEXT")` → ≥1 result
-- Assert no `SearchResult.text` contains "NAVTEXT", "SCRIPTTEXT", or "STYLETEXT"
-  (proves boilerplate was stripped before chunking, not just in unit test)
+- **`test_ingest_html`** — ingest the `.html` fixture end-to-end; assert chunks were
+  stored; search for the body content and confirm it is retrievable; search for a
+  boilerplate sentinel string and confirm no results are returned.
 
-**Test: `test_ingest_py`**
-- Ingest `tests/fixtures/sample.py`
-- Assert `chunk_count > 0`
-- Assert at least one chunk contains a known function name from the fixture
+- **`test_ingest_py`** — ingest the `.py` fixture end-to-end; assert chunks were
+  stored; confirm a known function name from the fixture is retrievable via search.
 
-**Test: `test_ingest_ipynb`**
-- Ingest `tests/fixtures/sample.ipynb`
-- Assert `chunk_count > 0`
-- Assert at least one chunk contains the known markdown cell sentinel string
+- **`test_ingest_ipynb`** — ingest the `.ipynb` fixture end-to-end; assert chunks
+  were stored; confirm the markdown cell sentinel string is retrievable via search.
 
-**Test: `test_ingest_directory_mixed`**
-- Call `ingest_directory` on `tests/fixtures/` (contains all 7 types)
-- Assert 7 `IngestResult` entries returned, all `status == "ok"`, all `chunk_count > 0`
+- **`test_ingest_directory_mixed`** — call `ingest_directory` on `tests/fixtures/`;
+  assert seven results are returned, each with status `ok` and at least one chunk.
 
-### Steps
+Run the full test suite after all five pass. Run the type-checker. Invoke
+`coderabbit:code-review` on all changed files and resolve blocking issues.
 
-- [ ] Create `tests/integration/test_extended_ingestion.py` with the 5 tests above
-- [ ] `uv run pytest tests/integration/test_extended_ingestion.py` → all green
-- [ ] `uv run pytest --tb=short` (full suite) → zero failures
-- [ ] `uv run mypy --strict src/` → zero errors
-- [ ] Invoke `coderabbit:code-review` on all changed files; resolve blocking issues
-- [ ] Commit: `test: integration tests for extended file ingestion`
+Commit: `test: integration tests for extended file ingestion`
 
 ---
 
 ## Step 5 — Exit Gate Script
 
-### What we're building
+Create `scripts/verify_phase3.sh`. The script runs the full test suite, runs the
+type-checker, and invokes `agentrag ingest` on each of the seven fixture files via
+the CLI to confirm the end-to-end path works outside of pytest. Script exits 0
+only if all steps pass. Run it and confirm exit 0.
 
-`scripts/verify_phase3.sh` — a runnable, deterministic exit gate. Same pattern
-as `scripts/verify_phase1.sh`. Exits 0 only when all checks pass.
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "=== Phase 3 exit gate ==="
-
-echo "--- pytest ---"
-uv run pytest --tb=short
-
-echo "--- mypy ---"
-uv run mypy --strict src/
-
-echo "--- CLI smoke: all 7 file types ---"
-for f in tests/fixtures/sample.txt \
-          tests/fixtures/sample.md  \
-          tests/fixtures/sample.pdf \
-          tests/fixtures/sample.docx \
-          tests/fixtures/sample.html \
-          tests/fixtures/sample.py   \
-          tests/fixtures/sample.ipynb; do
-    agentrag ingest "$f"
-    echo "  ingested: $f"
-done
-
-echo "=== Phase 3 exit gate PASSED ==="
-```
-
-### Steps
-
-- [ ] Create `scripts/verify_phase3.sh` with the above content
-- [ ] `bash scripts/verify_phase3.sh` → exits 0
-- [ ] Commit: `chore: add verify_phase3.sh exit gate script`
+Commit: `chore: add verify_phase3.sh exit gate script`
 
 ---
 
 ## Step 6 — PR
 
-- [ ] `git push origin phase/3-extended-file-support`
-- [ ] Open PR: `phase/3-extended-file-support` → `main`
-- [ ] PR title: `Phase 3: Extended File Support (.docx, .html, .py, .ipynb)`
-- [ ] CI green on branch before merge
-- [ ] After merge: update `specs/roadmap.md` Phase 3 entry to `COMPLETE`
+Push the branch, open a PR from `phase/3-extended-file-support` to `main`.
+Wait for CI green. After merge, update `specs/roadmap.md` Phase 3 to `COMPLETE`.

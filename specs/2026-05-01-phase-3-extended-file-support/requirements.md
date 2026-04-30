@@ -1,202 +1,150 @@
 # Phase 3 — Extended File Support — Requirements
 
-## What Phase 3 Is
+---
 
-Add support for four new file types — `.docx`, `.html`, `.py`, `.ipynb` — to the
-ingestion pipeline. Extend `ingest_directory` to recursively pick up all seven
-supported types. No new retrieval logic, no new MCP tools, no new external services.
+## What This Phase Delivers
 
-This phase touches **exactly two source files**:
+Four new file types become ingestible: `.docx`, `.html`, `.py`, `.ipynb`.
+The `ingest_directory` tool picks up all seven supported types recursively.
+No new MCP tools. No new retrieval logic. No new external services.
 
-| File | What changes |
-|------|-------------|
-| `src/agentrag/ingestion/reader.py` | 3 new private helpers + extended dispatch block |
-| `src/agentrag/server/tools.py` | Glob list in `ingest_directory` extended from 3 to 7 |
+---
 
-Everything else — `chunker.py`, `embedder.py`, `pipeline.py`, `store/qdrant.py`,
-`retrieval/`, `config.py`, `types.py` — is **untouched**.
+## Files Changed
+
+### `src/agentrag/ingestion/reader.py`
+
+This is the only production file with new logic. It gains three private helper
+functions — one for `.docx`, one for `.html`, one for `.ipynb` — and an extended
+dispatch block that routes each new suffix to the right helper. The public function
+`read_file` has an unchanged signature; callers see no difference.
+
+`.py` files require no new helper. They are plain UTF-8 text and use the same
+read path already in place for `.txt` and `.md` files. Only the supported suffix
+set needs to include `.py`.
+
+The module gains three new imports matching the three new helpers: the `json`
+standard library module for notebook parsing, the `BeautifulSoup` class from
+`beautifulsoup4` for HTML parsing, and the `Document` class from `python-docx`
+for Word document parsing.
+
+### `src/agentrag/server/tools.py`
+
+The only change is the extension list inside `ingest_directory`. It grows from
+three entries (`txt`, `md`, `pdf`) to seven by adding `docx`, `html`, `py`,
+and `ipynb`. No new logic, no new imports, no change to the function signature.
+The handler stays within the 15-line limit required by Article IV.1.
+
+### Nothing else changes
+
+`chunker.py`, `embedder.py`, `pipeline.py`, `store/qdrant.py`, `retrieval/`,
+`config.py`, `types.py`, and all seven MCP tool handlers are untouched. The
+pipeline already accepts any `RawDocument` — Phase 3's only job is to normalise
+new file types into that one shape.
 
 ---
 
 ## New Dependencies
 
-| Library | Version pinned | Why runtime, not dev-only |
-|---------|---------------|--------------------------|
-| `python-docx` | `>=1.1,<1.2` | End users ingesting `.docx` files need it installed |
-| `beautifulsoup4` | `>=4.12,<4.13` | End users ingesting `.html` files need it installed |
+`python-docx 1.1.x` and `beautifulsoup4 4.12.x` are added as runtime dependencies
+in `pyproject.toml`. They are runtime (not dev-only) because end users who ingest
+`.docx` or `.html` files need them installed. `.ipynb` and `.py` parsing require
+no new dependency.
 
-`.ipynb` parsing uses `json` (stdlib). `.py` reading uses `pathlib.Path.read_text`
-(stdlib). Neither requires a new dependency.
-
-`lxml` is **not** added. `html.parser` (stdlib) is the BeautifulSoup backend —
-sufficient for clean HTML and avoids a C-extension dependency.
+`lxml` is not added. The `html.parser` backend bundled with Python's standard
+library is used for BeautifulSoup — it handles clean HTML without a C-extension
+dependency.
 
 ---
 
-## What the Code Looks Like After Phase 3
-
-### `reader.py` — new import block
-
-```python
-import json                          # new — ipynb parsing
-from bs4 import BeautifulSoup        # new — html parsing
-from docx import Document            # new — docx parsing
-```
-
-Existing imports (`hashlib`, `logging`, `pathlib.Path`, `pymupdf`, `agentrag.types`)
-are unchanged.
-
-### `reader.py` — three new private helpers
-
-```python
-def _read_docx(path: Path) -> str:
-    """Extract paragraph text from a .docx file, skipping empty paragraphs."""
-    doc = Document(path)
-    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-
-
-def _read_html(path: Path) -> str:
-    """Extract body text from HTML after removing nav/header/footer/script/style."""
-    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-    for tag in soup.find_all(["nav", "header", "footer", "script", "style"]):
-        tag.decompose()
-    return soup.get_text(separator="\n", strip=True)
-
-
-def _read_ipynb(path: Path) -> str:
-    """Concatenate source from code and markdown cells in a Jupyter notebook."""
-    nb = json.loads(path.read_text(encoding="utf-8"))
-    parts = [
-        "".join(cell["source"])
-        for cell in nb.get("cells", [])
-        if cell.get("cell_type") in {"code", "markdown"}
-    ]
-    return "\n\n".join(parts)
-```
-
-### `reader.py` — updated dispatch in `read_file()`
-
-The public function signature is **unchanged**: `read_file(path: Path) -> RawDocument`.
-Only the internal suffix check and dispatch expand:
-
-```python
-# supported set grows from 3 to 7:
-if suffix not in {".pdf", ".txt", ".md", ".docx", ".html", ".py", ".ipynb"}:
-    raise ValueError(f"Unsupported file type: {suffix}")
-
-# dispatch adds 3 new branches; .py reuses existing read_text path:
-if suffix == ".pdf":
-    text = _read_pdf(path)
-elif suffix == ".docx":
-    text = _read_docx(path)
-elif suffix == ".html":
-    text = _read_html(path)
-elif suffix == ".ipynb":
-    text = _read_ipynb(path)
-else:                           # .txt, .md, .py
-    text = path.read_text(encoding="utf-8")
-```
-
-### `tools.py` — updated glob list in `ingest_directory`
-
-```python
-# Before (Phase 2):
-for ext in ["*.txt", "*.md", "*.pdf"]:
-
-# After (Phase 3):
-for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
-```
-
-The stale inline comment `# Phase 2: only .txt, .md, .pdf` is removed (Article III.3).
-No other change to `ingest_directory`. Handler stays ≤15 lines (Article IV.1).
-
----
-
-## Per-Type Parsing Decisions
+## Parsing Rules Per File Type
 
 ### `.docx`
 
-- **Library:** `python-docx` — `Document(path)` opens the file.
-- **What we extract:** `paragraph.text` for every paragraph where `text.strip() != ""`.
-- **What we skip:** empty paragraphs (whitespace only), tables, images, embedded objects.
-  Tables are structurally complex and out of scope for Phase 3.
-- **Join:** paragraphs joined with `"\n"`.
-- **Encoding:** handled internally by `python-docx` — no explicit encoding parameter needed.
+The reader opens the file with `python-docx`, iterates over its paragraph
+objects, and collects the text of each paragraph that is not blank. Paragraphs
+consisting only of whitespace are skipped. Tables, images, and embedded objects
+are not extracted in this phase. Paragraphs are joined with a single newline.
 
 ### `.html`
 
-- **Library:** `beautifulsoup4` with `html.parser` backend.
-- **Boilerplate removal:** `.decompose()` called on every `nav`, `header`, `footer`,
-  `script`, `style` tag. `decompose()` removes both the tag and its subtree from the
-  parse tree — not just the tag wrapper. This happens before `get_text()`.
-- **What we keep:** `<title>` stays (useful retrieval context). `<meta>` and `<link>`
-  stay (they contribute no text to `get_text()` output anyway).
-- **Text extraction:** `soup.get_text(separator="\n", strip=True)`.
-- **Malformed HTML:** `html.parser` is lenient and will not raise on broken markup.
+The reader parses the file with BeautifulSoup using the `html.parser` backend.
+Before extracting any text, it removes the `nav`, `header`, `footer`, `script`,
+and `style` elements and everything inside them. Only then is plain text
+extracted, with a newline separator between elements. The `title` element is
+left in because it provides useful retrieval context. Malformed HTML is tolerated
+— `html.parser` does not raise on broken markup.
 
 ### `.py`
 
-- **No new helper.** `.py` falls through to the existing `path.read_text(encoding="utf-8")`
-  branch — the same path used for `.txt` and `.md`.
-- **What we extract:** the raw source file verbatim. No AST parsing, no stripping.
-- **Why raw source:** the chunker splits on token boundaries; function names, docstrings,
-  and comments are all semantically valuable for retrieval without transformation.
-- **Encoding:** UTF-8 enforced. Non-UTF-8 `.py` files raise `UnicodeDecodeError`,
-  which `pipeline.py` catches and returns as `IngestResult(status="error")`.
+Raw UTF-8 source, read verbatim. No AST parsing, no comment stripping, no
+docstring isolation. The chunker already handles token-level splitting, so
+function names, docstrings, and comments all survive into the vector store as
+searchable content.
 
 ### `.ipynb`
 
-- **No library:** `json.loads(path.read_text(encoding="utf-8"))` — stdlib only.
-- **Cell types included:** `"code"` and `"markdown"`. `"raw"` cells are skipped.
-- **Source field:** each cell's `"source"` is a list of strings (notebook format v4).
-  `"".join(cell["source"])` reconstructs the cell text with no extra separators.
-- **Cell separator:** cells are joined with `"\n\n"` (double newline) so the chunker
-  sees clean block boundaries between cells.
-- **What we skip:** `cell["outputs"]` (stdout, stderr, display_data, execute_result).
-  Outputs are runtime noise — they embed timestamps, tracebacks, and large data blobs
-  that hurt retrieval signal.
-- **Malformed notebook:** `json.JSONDecodeError` propagates to `pipeline.py` as
-  `IngestResult(status="error")`.
+The reader parses the file as JSON. It iterates the notebook's cell list and
+collects the source text from cells with type `code` or `markdown`. Cells with
+type `raw` are skipped. Each cell's source is a list of strings in the notebook
+format — these are concatenated directly to form the cell text. Cells are then
+joined with a double newline to preserve block-level separation. Cell outputs
+(stdout, stderr, display data, execution results) are not extracted; they are
+runtime noise that degrades retrieval signal.
 
 ---
 
-## Data Flow After Phase 3
+## Test Files
 
-```
-User file (.docx / .html / .py / .ipynb)
-  │
-  ▼
-read_file(path)                        ← reader.py (extended)
-  dispatches to _read_docx / _read_html / _read_ipynb / read_text
-  returns RawDocument(source_id, filename, text, metadata={})
-  │
-  ▼                                    ← unchanged below this line
-chunker.py  →  embedder.py  →  store/qdrant.py
-```
+### `tests/unit/test_reader.py`
 
-The chunker, embedder, and store see `RawDocument` — they are completely unaware of
-the file type. Phase 3's entire job is to normalise new file types into that one type.
+Four new test cases are added to the existing file, one per new type.
+
+Each test uses a dedicated fixture file from `tests/fixtures/` and asserts the
+shape and content of the returned `RawDocument`. The `.docx` test confirms that
+empty paragraphs are filtered. The `.html` test uses sentinel strings to confirm
+that boilerplate content is absent and body content is present. The `.py` test
+confirms that the output is byte-identical to the input file. The `.ipynb` test
+confirms that code and markdown cell text is present and raw cell text is absent.
+
+### `tests/unit/test_tools.py`
+
+One new test case is added. It creates a temporary directory with one file of
+each of the seven supported extensions, mocks the ingest pipeline, and asserts
+that `ingest_directory` processes all seven files with no type silently skipped.
+
+### `tests/integration/test_extended_ingestion.py`
+
+A new integration test file with five tests, each running the full pipeline
+against a real embedded Qdrant instance. One test per new file type confirms
+that chunks are stored and that the content is retrievable via `search_documents`.
+The fifth test runs `ingest_directory` on the fixtures folder and confirms all
+seven types are processed successfully in a single call.
 
 ---
 
-## What Phase 3 Does NOT Change
+## Test Fixtures
 
-- `RawDocument` dataclass — no new fields
-- `Chunk`, `EmbeddedChunk`, `SearchResult` — untouched
-- `pipeline.py` — untouched; already handles any `RawDocument`
-- Chunking parameters (512 tokens / 64 overlap) — unchanged
-- Embedding model — unchanged
-- Qdrant collection schema — unchanged
-- All 7 existing MCP tools — unchanged
-- `config.py` — no new env vars
+| File | Content | Purpose |
+|------|---------|---------|
+| `tests/fixtures/sample.docx` | Three paragraphs of prose, one blank paragraph | Verifies paragraph text extraction and empty-paragraph filtering |
+| `tests/fixtures/sample.html` | Nav, header, footer, script, style with sentinel strings; main section with body content | Verifies boilerplate removal and body preservation |
+| `tests/fixtures/sample.py` | At least three functions with docstrings, 30+ lines | Verifies raw-text pass-through; used in integration test for search |
+| `tests/fixtures/sample.ipynb` | Two code cells, two markdown cells, one raw cell, each with unique sentinel strings | Verifies cell type filtering and source concatenation |
+
+---
+
+## Constraints
+
+- `reader.py` must not import anything from `retrieval/`, `server/`, or `qdrant_client`
+- `RawDocument` gains no new fields — the dataclass is unchanged
+- The `make_source_id` function is unchanged; new file types use the same hash
+- All code must pass `black`, `ruff`, and `mypy --strict` before committing
 
 ---
 
 ## Out of Scope
 
-- `.epub`, `.odt`, `.csv`, `.xlsx` — not in roadmap; do not add
-- URL/web ingestion — explicitly a non-goal in `specs/mission.md`
-- Table extraction from `.docx` — deferred; adds complexity for limited gain
-- Cell outputs in `.ipynb` — runtime noise that degrades retrieval quality
-- Cross-encoder re-ranking — Phase 5
-- Query decomposition / Gemini integration — Phase 4
+`.epub`, `.odt`, `.csv`, `.xlsx`, and URL ingestion are not in this phase.
+Table extraction from `.docx`, cell output extraction from `.ipynb`, and
+cross-encoder re-ranking are deferred to later phases.
