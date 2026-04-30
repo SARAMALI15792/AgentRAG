@@ -11,7 +11,7 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Layer | Library / Tool | Version | Rationale |
 |---|---|---|---|
 | Language | Python | 3.12+ | Structural pattern matching, `tomllib`, typing improvements. Minimum enforced in `pyproject.toml`. |
-| MCP server | `mcp` (official Python SDK) | ==1.27.0 (pinned exact) | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. |
+| MCP server | `mcp` (official Python SDK) | ==1.27.0 (pinned exact) | stdio and HTTP transports. First-class tool registration. Pin the version — the MCP SDK changes frequently. **Phase 2 note:** FastMCP requires `@asynccontextmanager` lifespan hook for shared resource initialization (Settings, QdrantStore). This pattern is mandatory for all FastMCP apps. |
 | HTTP server | FastAPI | 0.136.x | Async, minimal, schema-first. Powers HTTP transport for the MCP server. |
 | ASGI server | Uvicorn | 0.46.x | Production-grade ASGI runner for FastAPI. |
 | Vector store | `qdrant-client` | 1.17.x | Embedded mode: Qdrant runs in-process, no Docker required. Persistent to disk. |
@@ -33,10 +33,10 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Ruff | 0.15.x | Linter and import sorter. Extends Black config. 0.15.x adds significant new rules over 0.4.x — pin to `0.15.x` floor. |
 | mypy | 1.10.x | Static type checker. `--strict` mode. Minimum 1.10; pin exact version in `pyproject.toml`. |
 | pytest | 8.x | Test runner. Only test framework permitted. |
-| pytest-asyncio | 1.3.x | Async test support for FastAPI endpoints. **Breaking change from 0.x:** version 1.x changed the default mode and deprecated several fixture patterns. Must be configured with `asyncio_mode = "auto"` in `pyproject.toml` under `[tool.pytest.ini_options]`. Do not use 0.x patterns (`@pytest.mark.asyncio` decorator, `event_loop` fixture) — they are removed in 1.x. |
+| pytest-asyncio | 1.3.x | Async test support for FastAPI endpoints. **Breaking change from 0.x:** version 1.x changed the default mode and deprecated several fixture patterns. Must be configured with `asyncio_mode = "auto"` in `pyproject.toml` under `[tool.pytest.ini_options]`. Do not use 0.x patterns (`@pytest.mark.asyncio` decorator, `event_loop` fixture) — they are removed in 1.x. **Phase 2 note:** Integration tests failed until this config was added. |
 | pytest-cov | 5.x | Coverage reporting. |
 | hatchling | latest | Build backend for PyPI packaging. |
-| httpx | 0.27.x | Async HTTP test client. Required by `pytest-asyncio` integration tests against the FastAPI server. Must be listed as a dev dependency, not a runtime dependency. |
+| httpx | 0.27.x | Async HTTP test client. Required by `pytest-asyncio` integration tests against the FastAPI server. Must be listed as a dev dependency, not a runtime dependency. **Phase 2 note:** Used `httpx.ASGITransport` for testing FastAPI app without network calls. |
 
 ---
 

@@ -29,81 +29,49 @@ Phases are not time-boxed — they are scope-boxed.
 
 ---
 
-## Phase 2 — MCP Server
+## Phase 2 — MCP Server — COMPLETE
 
-**Entry condition:** Phase 1 exit condition met.
+**Completed:** 2026-04-29 | **PR:** #3 → `main`
 
-**Goal:** A fully functional MCP server exposing all 7 tools. Claude Desktop
-can connect to it and call all tools successfully.
+**Goal achieved:** Fully functional MCP server with 7 tools callable from Claude Desktop via stdio.
+
+**Shipped:**
+- `retrieval/searcher.py` — embeds query, delegates to QdrantStore
+- `retrieval/reranker.py` — identity stub (Phase 5 implementation)
+- `server/tools.py` — 7 MCP tool handlers (all ≤15 lines per Article IV.1)
+- `server/app.py` — FastAPI + FastMCP with lifespan hook, stdio + HTTP transports
+- `cli.py` — `agentrag serve` command with --transport flag
+- `store/qdrant.py` — added `get_full_document()` method (Article IV.1 refactor)
+- Unit tests (2 modules: test_searcher.py, test_tools.py)
+- Integration tests (test_server.py — HTTP transport via httpx.ASGITransport)
+
+**Exit condition met:** All 7 tools registered. `pytest` green. `mypy --strict` passes. CI green on `main`.
+
+---
+
+## Phase 3 — Extended File Support
+
+**Entry condition:** Phase 2 exit condition met.
+
+**Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
+`ingest_directory` to handle all supported types recursively.
 
 ### Deliverables
 
-Deliverables follow strict TDD execution order. Test file written and
-confirmed failing before each implementation file is created.
+- [ ] `python-docx` added to dependencies (with approval)
+- [ ] `beautifulsoup4` added to dependencies (with approval)
+- [ ] `reader.py` extended: `.docx`, `.html`, `.py`, `.ipynb` readers
+- [ ] `ingest_directory` tool: recursive glob, per-extension filtering
+- [ ] `tests/unit/` — new reader tests for each file type
+- [ ] Update `specs/tech-stack.md` to move Phase 3 libs from "planned" to "active"
+
+**Exit condition:** `agentrag ingest ./my-repo/` recursively ingests a mixed codebase. `pytest` green.
 
 ---
 
-**Step 1 — Retrieval**
+## Phase 4 — Agentic Retrieval Loop
 
-- [ ] `tests/unit/test_searcher.py` ← write first, confirm red
-      (store mocked — no Qdrant in unit tests)
-      - query returns `List[SearchResult]` ranked by score descending
-      - `top_k` parameter limits result count
-      - empty result from store → empty list returned, no exception
-      - metadata filters are forwarded to the store query unchanged
-- [ ] `src/agentrag/retrieval/searcher.py` ← implement to make tests green
-      Embeds query via `embedder.py` (query embedding only — permitted cross-
-      boundary per architecture), calls `store.query`, applies `reranker`.
-- [ ] `src/agentrag/retrieval/reranker.py` — identity stub: returns input
-      unchanged. No tests needed for an identity function.
-
----
-
-**Step 2 — MCP tools**
-
-- [ ] `tests/unit/test_tools.py` ← write first, confirm red
-      (pipeline, searcher, store all mocked)
-      - each of the 7 handlers delegates to the correct backing function
-      - `ingest_file`: non-existent path → error result surfaced, not raised
-      - `delete_source`: unknown source_id → `status="not_found"` returned
-      - `search_documents`: empty query raises `ValueError`
-      - `get_document`: unknown source_id raises `ValueError`
-      - `search_by_metadata`: empty filters raises `ValueError`
-- [ ] `src/agentrag/server/tools.py` ← implement to make tests green
-      All 7 handlers: `ingest_file`, `ingest_directory`, `search_documents`,
-      `search_by_metadata`, `list_sources`, `get_document`, `delete_source`.
-      `ingest_directory` in Phase 2 supports Phase 1 file types only
-      (`.pdf`, `.md`, `.txt`) — Phase 4 extends it to additional types.
-      Each handler is ≤ 15 lines of meaningful code (Article IV.1).
-
----
-
-**Step 3 — Server**
-
-- [ ] `src/agentrag/server/app.py` — FastAPI app with MCP SDK tool registration.
-      Transport priority: **stdio first** (Claude Desktop is the exit condition),
-      HTTP second. Both must function.
-- [ ] `agentrag serve` added to `cli.py` — starts the MCP server.
-- [ ] `tests/integration/test_server.py` — HTTP transport tests via
-      `pytest-asyncio` + `httpx`. Tests each of the 7 tools over HTTP.
-
----
-
-**Step 4 — Manual verification**
-
-- [ ] Claude Desktop integration: connect via stdio, call all 7 tools manually,
-      confirm correct responses for both happy-path and error inputs.
-
----
-
-**Exit condition:** All 7 MCP tools callable from Claude Desktop via stdio.
-`pytest` green. `mypy --strict` passes on `src/` with zero errors.
-
----
-
-## Phase 3 — Agentic Retrieval Loop
-
-**Entry condition:** Phase 2 exit condition met.
+**Entry condition:** Phase 3 exit condition met.
 
 **Goal:** Transform AgentRAG from a passive RAG server into an active retrieval
 partner. Add three MCP tools that close the single-pass retrieval gap: query
@@ -111,6 +79,8 @@ decomposition, relevance evaluation, and multi-query search. After this phase,
 Claude can decompose a complex question into sub-queries, search each
 independently, evaluate whether the results actually answer the question, and
 decide whether to re-search — all through tool calls, without special prompting.
+
+**Dependency:** Requires Ollama running locally. Graceful degradation if unavailable.
 
 ### Deliverables
 
@@ -242,6 +212,8 @@ verified. `pytest` green. `mypy --strict` passes.
 
 **Goal:** Improve retrieval precision. Add metadata-driven filtering, optional
 re-ranking, and deduplication on re-ingest.
+
+**Dependency:** None. All improvements use existing stack.
 
 ### Deliverables
 

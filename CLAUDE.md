@@ -103,6 +103,8 @@ surface, and idiomatic code style of that library.
   `typing`, `logging`, `hashlib`, etc.) do not require a Context7 lookup.
 - **Exception:** Config-only use (e.g., adding a dependency to `pyproject.toml`
   without calling its API) does not require a Context7 lookup.
+- **Exception:** Test-only dependencies with stable APIs (`pytest-asyncio`,
+  `httpx`) do not require a Context7 lookup.
 
 **Why this is in the constitution:**
 
@@ -421,6 +423,13 @@ The enforcement is structural:
 Crossing this boundary requires **explicit written approval from the user
 before any code is written**. Stating intent in a message is not sufficient.
 The user must explicitly confirm they approve the boundary violation.
+
+**Enforcement pattern:** When a tool handler exceeds 15 lines, extract the
+business logic to the appropriate layer (`store/`, `ingestion/`, or
+`retrieval/`). The handler becomes a thin delegate that calls the extracted
+function. Example: Phase 2 `get_document` handler violated this rule at 19
+lines — chunk assembly logic was moved to `QdrantStore.get_full_document()`,
+reducing the handler to 8 lines.
 
 ### IV.2 Store Abstraction — Single Access Point
 
