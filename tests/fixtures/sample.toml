@@ -1,0 +1,41 @@
+[project]
+name = "agentrag"
+version = "0.1.0"
+description = "Agentic RAG MCP Server"
+requires_python = ">=3.12"
+authors = [{name = "AgentRAG Team", email = "team@agentrag.dev"}]
+
+[embedding]
+model = "sentence-transformers/all-MiniLM-L6-v2"
+vector_dim = 384
+batch_size = 32
+device = "cpu"
+
+[chunking]
+size = 512
+overlap = 64
+strategy = "sliding_window"
+
+[storage]
+backend = "qdrant"
+collection = "documents"
+data_dir = "~/.agentrag"
+persist = true
+
+[server]
+host = "localhost"
+port = 8000
+transport = "stdio"
+
+[retrieval]
+top_k = 5
+rerank = false
+
+[logging]
+level = "INFO"
+structured = false
+
+[features]
+semantic_search = true
+agentic_retrieval = true
+multi_collection = false

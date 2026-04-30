@@ -1,0 +1,19 @@
+1
+00:00:01,000 --> 00:00:04,000
+Welcome to the AgentRAG tutorial on semantic search.
+
+2
+00:00:04,500 --> 00:00:08,000
+In this video, we will explore how to build a RAG pipeline from scratch.
+
+3
+00:00:08,500 --> 00:00:13,000
+First, we need to ingest our documents into the vector store using embeddings.
+
+4
+00:00:13,500 --> 00:00:17,500
+The embedding model converts each text chunk into a dense vector representation.
+
+5
+00:00:18,000 --> 00:00:23,000
+Finally, queries are embedded and matched against stored vectors for retrieval.

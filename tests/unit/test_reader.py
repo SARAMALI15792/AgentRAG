@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from agentrag.ingestion.reader import read_file
 from agentrag.types import RawDocument
+
+FIXTURES = Path("tests/fixtures")
 
 
 def test_read_txt(tmp_path: Path) -> None:
@@ -124,3 +127,160 @@ def test_read_ipynb() -> None:
     assert "CODE_SENTINEL" in result.text
     assert "MARKDOWN_SENTINEL" in result.text
     assert "RAW_SENTINEL" not in result.text
+
+
+# ---------------------------------------------------------------------------
+# Office readers (Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+def test_read_xlsx() -> None:
+    """Excel fixture read extracts text from all sheets including headers."""
+    result = read_file(FIXTURES / "sample.xlsx")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.xlsx"
+    assert len(result.text) > 0
+    assert "Name" in result.text  # header row preserved
+    assert "Alice Johnson" in result.text
+    assert "Products" in result.text  # sheet 2 content present
+
+
+def test_read_pptx() -> None:
+    """PowerPoint fixture read extracts title, body, and speaker notes."""
+    result = read_file(FIXTURES / "sample.pptx")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.pptx"
+    assert len(result.text) > 0
+    assert "AgentRAG" in result.text  # title from slide 1
+    assert "Architecture" in result.text  # title from slide 2
+    assert "Speaker notes" in result.text or "Introduction slide" in result.text
+
+
+def test_read_csv() -> None:
+    """CSV fixture read produces header row and all data rows as text."""
+    result = read_file(FIXTURES / "sample.csv")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.csv"
+    assert len(result.text) > 0
+    assert "name" in result.text.lower()  # header preserved
+    assert "Alice Johnson" in result.text
+    assert "Bob Smith" in result.text
+
+
+# ---------------------------------------------------------------------------
+# eBook readers (Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+def test_read_epub() -> None:
+    """EPUB fixture read extracts text from all XHTML chapters."""
+    result = read_file(FIXTURES / "sample.epub")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.epub"
+    assert len(result.text) > 0
+    assert "Retrieval-Augmented Generation" in result.text
+    assert "Vector Embeddings" in result.text
+
+
+def test_read_mobi_delegates_to_epub(tmp_path: Path) -> None:
+    """MOBI reader extracts text by converting via mobi.extract then reading as EPUB."""
+    fake_mobi = tmp_path / "test.mobi"
+    fake_mobi.write_bytes(b"fake mobi content")
+    epub_path = FIXTURES / "sample.epub"
+
+    with patch("agentrag.ingestion.readers.ebooks.mobi_extract") as mock_extract:
+        mock_extract.return_value = (str(tmp_path), str(epub_path))
+        result = read_file(fake_mobi)
+
+    assert isinstance(result, RawDocument)
+    assert len(result.text) > 0
+    assert "Retrieval-Augmented Generation" in result.text
+
+
+# ---------------------------------------------------------------------------
+# Structured data readers (Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+def test_read_json() -> None:
+    """JSON fixture read produces pretty-printed text with key names present."""
+    result = read_file(FIXTURES / "sample.json")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.json"
+    assert len(result.text) > 0
+    assert "AgentRAG" in result.text
+    assert "embedding" in result.text
+
+
+def test_read_yaml() -> None:
+    """YAML fixture read produces text with key names and values."""
+    result = read_file(FIXTURES / "sample.yaml")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.yaml"
+    assert len(result.text) > 0
+    assert "agentrag" in result.text.lower()
+    assert "embedding" in result.text.lower()
+
+
+def test_read_xml() -> None:
+    """XML fixture read strips tags and returns only text content."""
+    result = read_file(FIXTURES / "sample.xml")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.xml"
+    assert len(result.text) > 0
+    assert "Retrieval-Augmented Generation" in result.text
+    assert "<" not in result.text  # tags stripped
+
+
+def test_read_toml() -> None:
+    """TOML fixture read produces text with section and key names."""
+    result = read_file(FIXTURES / "sample.toml")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.toml"
+    assert len(result.text) > 0
+    assert "agentrag" in result.text.lower()
+    assert "embedding" in result.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Subtitle readers (Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+def test_read_srt() -> None:
+    """SRT fixture read extracts timestamped subtitle text."""
+    result = read_file(FIXTURES / "sample.srt")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.srt"
+    assert len(result.text) > 0
+    assert "AgentRAG" in result.text
+    assert "semantic search" in result.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Email readers (Phase 3B)
+# ---------------------------------------------------------------------------
+
+
+def test_read_eml() -> None:
+    """EML fixture read extracts subject, headers, and body text."""
+    result = read_file(FIXTURES / "sample.eml")
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.eml"
+    assert len(result.text) > 0
+    assert "Phase 3B" in result.text
+    assert "Alice" in result.text
+
+
+# ---------------------------------------------------------------------------
+# Empty-extraction contract (Article XIV.2)
+# ---------------------------------------------------------------------------
+
+
+def test_empty_extraction_raises_value_error(tmp_path: Path) -> None:
+    """Reader that returns empty string must raise ValueError per Article XIV.2."""
+    # XML with only tags and no text nodes produces empty extraction
+    empty_xml = tmp_path / "empty.xml"
+    empty_xml.write_text("<root><child/></root>", encoding="utf-8")
+    with pytest.raises(ValueError, match="File is empty"):
+        read_file(empty_xml)

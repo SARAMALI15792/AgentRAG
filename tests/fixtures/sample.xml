@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+    <book id="bk001">
+        <title>Introduction to Retrieval-Augmented Generation</title>
+        <author>Alice Johnson</author>
+        <genre>Computer Science</genre>
+        <price>49.99</price>
+        <description>A comprehensive guide to building RAG systems with modern vector databases and language models.</description>
+    </book>
+    <book id="bk002">
+        <title>Vector Databases in Practice</title>
+        <author>Bob Smith</author>
+        <genre>Database Engineering</genre>
+        <price>44.99</price>
+        <description>Practical techniques for deploying and optimizing vector stores for semantic search applications.</description>
+    </book>
+    <book id="bk003">
+        <title>Semantic Search Fundamentals</title>
+        <author>Carol White</author>
+        <genre>Information Retrieval</genre>
+        <price>39.99</price>
+        <description>Core concepts of dense retrieval, embedding models, and approximate nearest neighbor search.</description>
+    </book>
+</catalog>

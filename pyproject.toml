@@ -34,6 +34,8 @@ dev = [
     "hatchling",
     "numpy>=1.26",
     "types-beautifulsoup4",
+    "types-PyYAML",
+    "types-openpyxl",
 ]
 office = [
     "openpyxl>=3.1.0,<3.2.0",

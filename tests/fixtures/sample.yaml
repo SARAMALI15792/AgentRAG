@@ -1,0 +1,37 @@
+project:
+  name: AgentRAG
+  version: 1.0.0
+  description: Agentic RAG MCP Server for semantic document retrieval
+
+database:
+  host: localhost
+  port: 6333
+  collection: documents
+  vector_dim: 384
+
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  device: cpu
+  batch_size: 32
+
+chunking:
+  size: 512
+  overlap: 64
+  strategy: sliding_window
+
+retrieval:
+  top_k: 5
+  rerank: false
+  score_threshold: 0.5
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+features:
+  - name: semantic_search
+    enabled: true
+  - name: agentic_retrieval
+    enabled: true
+  - name: multi_collection
+    enabled: false
