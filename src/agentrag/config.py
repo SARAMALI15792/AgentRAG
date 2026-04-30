@@ -29,10 +29,10 @@ class Settings(BaseSettings):
     port: int = 8000
     transport: str = "stdio"
 
-    # Phase 3+ features — defined here so Settings is complete across all phases
+    # Phase 4+ features — defined here so Settings is complete across all phases
     rerank: bool = False
-    ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2"
+    google_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
     query_expand: bool = False
 
     def model_post_init(self, __context: Any) -> None:
