@@ -69,3 +69,58 @@ def test_empty_file_raises(tmp_path: Path) -> None:
     empty_file.write_text("", encoding="utf-8")
     with pytest.raises(ValueError, match="File is empty"):
         read_file(empty_file)
+
+
+def test_read_docx() -> None:
+    """DOCX fixture produces RawDocument with paragraphs joined and blank filtered."""
+    docx_path = Path("tests/fixtures/sample.docx")
+    result = read_file(docx_path)
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.docx"
+    assert len(result.source_id) == 16
+    assert all(c in "0123456789abcdef" for c in result.source_id)
+    assert len(result.text) > 0
+    # blank paragraph from fixture must not appear as an empty line cluster
+    assert result.text.strip() != ""
+    # at least one of the known paragraphs is present
+    assert "AgentRAG" in result.text
+
+
+def test_read_html() -> None:
+    """HTML fixture read strips boilerplate and preserves body content."""
+    html_path = Path("tests/fixtures/sample.html")
+    result = read_file(html_path)
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.html"
+    # body sentinel must be present
+    assert "BODY_SENTINEL" in result.text
+    # boilerplate sentinels must be absent
+    assert "NAV_SENTINEL" not in result.text
+    assert "HEADER_SENTINEL" not in result.text
+    assert "FOOTER_SENTINEL" not in result.text
+    assert "SCRIPT_SENTINEL" not in result.text
+    assert "STYLE_SENTINEL" not in result.text
+    # no raw angle-bracket characters
+    assert "<" not in result.text
+    assert ">" not in result.text
+
+
+def test_read_py() -> None:
+    """Python fixture read returns raw source byte-for-byte identical."""
+    py_path = Path("tests/fixtures/sample.py")
+    result = read_file(py_path)
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.py"
+    expected = py_path.read_text(encoding="utf-8")
+    assert result.text == expected
+
+
+def test_read_ipynb() -> None:
+    """Notebook fixture read includes code+markdown cells and excludes raw cells."""
+    ipynb_path = Path("tests/fixtures/sample.ipynb")
+    result = read_file(ipynb_path)
+    assert isinstance(result, RawDocument)
+    assert result.filename == "sample.ipynb"
+    assert "CODE_SENTINEL" in result.text
+    assert "MARKDOWN_SENTINEL" in result.text
+    assert "RAW_SENTINEL" not in result.text

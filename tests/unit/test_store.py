@@ -75,3 +75,41 @@ def test_list_sources_empty_store_returns_empty_list(settings: Settings) -> None
     store = QdrantStore(settings)
     sources = store.list_sources()
     assert sources == []
+
+
+def test_filter_sources_by_filename(settings: Settings) -> None:
+    """filter_sources with filename filter returns only matching source."""
+    store = QdrantStore(settings)
+    store.upsert(_make_chunks("src1", 2, filename="doc.txt"))
+    store.upsert(_make_chunks("src2", 2, filename="other.txt"))
+    results = store.filter_sources({"filename": "doc.txt"})
+    assert len(results) == 1
+    assert results[0].source_id == "src1"
+
+
+def test_filter_sources_by_source_id(settings: Settings) -> None:
+    """filter_sources with source_id filter returns correct source."""
+    store = QdrantStore(settings)
+    store.upsert(_make_chunks("src1", 2))
+    store.upsert(_make_chunks("src2", 2))
+    results = store.filter_sources({"source_id": "src1"})
+    assert len(results) == 1
+    assert results[0].source_id == "src1"
+
+
+def test_filter_sources_no_match_returns_empty(settings: Settings) -> None:
+    """filter_sources with no matching source returns empty list."""
+    store = QdrantStore(settings)
+    store.upsert(_make_chunks("src1", 2, filename="doc.txt"))
+    results = store.filter_sources({"filename": "nonexistent.txt"})
+    assert results == []
+
+
+def test_filter_sources_multiple_criteria(settings: Settings) -> None:
+    """filter_sources with two conditions returns only source matching both."""
+    store = QdrantStore(settings)
+    store.upsert(_make_chunks("src1", 2, filename="doc.txt"))
+    store.upsert(_make_chunks("src2", 2, filename="doc.txt"))
+    results = store.filter_sources({"filename": "doc.txt", "source_id": "src1"})
+    assert len(results) == 1
+    assert results[0].source_id == "src1"

@@ -101,6 +101,17 @@ class QdrantStore:
             )
         return results
 
+    def filter_sources(self, filters: dict[str, Any]) -> list[SourceInfo]:
+        """Return sources where every filter key-value pair matches."""
+        return [
+            s
+            for s in self.list_sources()
+            if all(
+                s.metadata.get(k) == v or getattr(s, k, None) == v
+                for k, v in filters.items()
+            )
+        ]
+
     def delete(self, source_id: str) -> int:
         """Delete all chunks for source_id and return the count removed."""
         # Count first so the caller knows whether the source existed.

@@ -18,8 +18,8 @@ dependency requires user approval before it appears in `pyproject.toml`.
 | Embeddings | `sentence-transformers` | 3.x | Local embedding inference. Default model: `all-MiniLM-L6-v2` (fast, small, accurate). The chunker must tokenize using the same model's `AutoTokenizer` (bundled with `transformers`, already a transitive dependency of `sentence-transformers`) so chunk token counts exactly match what the embedder sees. Do not use character counts or `tiktoken` for chunk sizing. |
 | LLM (cloud) | `google-genai` (Gemini API) | 1.x | Google Gemini 2.0 Flash via the official `google-genai` Python SDK. Free tier, generous quota, no local setup. Used for query decomposition and chunk evaluation in Phase 4. Do not add any Gemini calls until Phase 4 begins. |
 | PDF parsing | `pymupdf` (fitz) | 1.24.x | Fastest Python PDF parser. Handles complex layouts, embedded images, multi-column text. |
-| DOCX parsing | `python-docx` | 1.1.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
-| HTML parsing | `beautifulsoup4` | 4.12.x | Phase 3. Listed here for planning. Do not add until Phase 3 begins. |
+| DOCX parsing | `python-docx` | 1.1.x | Phase 3. Iterate `doc.paragraphs`, filter blanks, join with `\n`. |
+| HTML parsing | `beautifulsoup4` | 4.12.x | Phase 3. `html.parser` backend. Decompose boilerplate tags before `get_text()`. |
 | Settings | `pydantic-settings` | 2.x | Typed settings from env vars and `.env` files. Powers `src/agentrag/config.py`. |
 | CLI | `typer` | 0.12.x | Builds `agentrag serve` and `agentrag ingest` CLI commands from type-annotated functions. |
 

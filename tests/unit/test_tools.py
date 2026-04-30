@@ -105,11 +105,15 @@ def test_ingest_directory_delegates_to_pipeline_per_file(
         with patch("agentrag.server.tools.Path") as mock_path_class:
             mock_dir = MagicMock()
             mock_dir.is_dir.return_value = True
-            # rglob called 3 times (once per extension), return 1 file per call
+            # rglob called once per extension (7 total); 3 return files, 4 empty
             mock_dir.rglob.side_effect = [
                 [Path("/tmp/a.txt")],
-                [Path("/tmp/b.pdf")],
-                [Path("/tmp/c.md")],
+                [Path("/tmp/b.md")],
+                [Path("/tmp/c.pdf")],
+                [],
+                [],
+                [],
+                [],
             ]
             mock_path_class.return_value = mock_dir
 
@@ -137,12 +141,22 @@ def test_search_documents_empty_query_raises_valueerror() -> None:
 
 
 def test_search_by_metadata_delegates_to_store(mock_store: MagicMock) -> None:
-    """search_by_metadata delegates to store.list_sources with filter."""
+    """search_by_metadata delegates to store.filter_sources."""
+    mock_store.filter_sources.return_value = [
+        SourceInfo(
+            source_id="abc",
+            filename="test.txt",
+            chunk_count=5,
+            metadata={},
+            ingested_at="2026-04-29T00:00:00Z",
+        )
+    ]
     with patch("agentrag.server.tools.QdrantStore", return_value=mock_store):
         results = search_by_metadata(filters={"filename": "test.txt"})
 
     assert len(results) == 1
     assert results[0].filename == "test.txt"
+    mock_store.filter_sources.assert_called_once_with({"filename": "test.txt"})
 
 
 def test_search_by_metadata_empty_filters_raises_valueerror() -> None:
@@ -209,3 +223,18 @@ def test_delete_source_unknown_returns_not_found(mock_store: MagicMock) -> None:
 
     assert result.status == "not_found"
     assert result.chunks_deleted == 0
+
+
+def test_ingest_directory_all_seven_types(
+    mock_pipeline: MagicMock, tmp_path: Path
+) -> None:
+    """ingest_directory processes all 7 supported extensions, one file each."""
+    for ext in ["txt", "md", "pdf", "docx", "html", "py", "ipynb"]:
+        (tmp_path / f"sample.{ext}").write_bytes(b"placeholder")
+
+    with patch("agentrag.server.tools.ingest", mock_pipeline):
+        results = ingest_directory(directory_path=str(tmp_path))
+
+    assert len(results) == 7
+    assert mock_pipeline.call_count == 7
+    assert all(r.status == "ok" for r in results)
