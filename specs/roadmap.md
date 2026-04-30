@@ -29,12 +29,33 @@ Phases are not time-boxed — they are scope-boxed.
 
 ---
 
-## Phase 2 — MCP Server
+## Phase 2 — MCP Server — COMPLETE
 
-**Entry condition:** Phase 1 exit condition met.
+**Completed:** 2026-04-29 | **PR:** #3 → `main`
 
-**Goal:** A fully functional MCP server exposing all 7 tools. Claude Desktop
-can connect to it and call all tools successfully.
+**Goal achieved:** Fully functional MCP server with 7 tools callable from Claude Desktop via stdio.
+
+**Shipped:**
+- `retrieval/searcher.py` — embeds query, delegates to QdrantStore
+- `retrieval/reranker.py` — identity stub (Phase 5 implementation)
+- `server/tools.py` — 7 MCP tool handlers (all ≤15 lines per Article IV.1)
+- `server/app.py` — FastAPI + FastMCP with lifespan hook, stdio + HTTP transports
+- `cli.py` — `agentrag serve` command with --transport flag
+- `store/qdrant.py` — added `get_full_document()` method (Article IV.1 refactor)
+- Unit tests (2 modules: test_searcher.py, test_tools.py)
+- Integration tests (test_server.py — HTTP transport via httpx.ASGITransport)
+
+**Exit condition met:** All 7 tools registered. `pytest` green. `mypy --strict` passes. CI green on `main`.
+
+---
+
+## Phase 3 — Extended File Support
+
+**Entry condition:** Phase 2 exit condition met.
+
+**Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
+`ingest_directory` to handle all supported types recursively. No new
+external services — pure reader extensions.
 
 ### Deliverables
 
@@ -43,67 +64,67 @@ confirmed failing before each implementation file is created.
 
 ---
 
-**Step 1 — Retrieval**
+**Step 0 — Context7 lookups** _(before any code)_
 
-- [ ] `tests/unit/test_searcher.py` ← write first, confirm red
-      (store mocked — no Qdrant in unit tests)
-      - query returns `List[SearchResult]` ranked by score descending
-      - `top_k` parameter limits result count
-      - empty result from store → empty list returned, no exception
-      - metadata filters are forwarded to the store query unchanged
-- [ ] `src/agentrag/retrieval/searcher.py` ← implement to make tests green
-      Embeds query via `embedder.py` (query embedding only — permitted cross-
-      boundary per architecture), calls `store.query`, applies `reranker`.
-- [ ] `src/agentrag/retrieval/reranker.py` — identity stub: returns input
-      unchanged. No tests needed for an identity function.
+- `python-docx` — `Document`, paragraph iteration API
+- `beautifulsoup4` — `BeautifulSoup`, tag extraction, `get_text()`
 
 ---
 
-**Step 2 — MCP tools**
+**Step 1 — Dependencies**
 
-- [ ] `tests/unit/test_tools.py` ← write first, confirm red
-      (pipeline, searcher, store all mocked)
-      - each of the 7 handlers delegates to the correct backing function
-      - `ingest_file`: non-existent path → error result surfaced, not raised
-      - `delete_source`: unknown source_id → `status="not_found"` returned
-      - `search_documents`: empty query raises `ValueError`
-      - `get_document`: unknown source_id raises `ValueError`
-      - `search_by_metadata`: empty filters raises `ValueError`
-- [ ] `src/agentrag/server/tools.py` ← implement to make tests green
-      All 7 handlers: `ingest_file`, `ingest_directory`, `search_documents`,
-      `search_by_metadata`, `list_sources`, `get_document`, `delete_source`.
-      `ingest_directory` in Phase 2 supports Phase 1 file types only
-      (`.pdf`, `.md`, `.txt`) — Phase 4 extends it to additional types.
-      Each handler is ≤ 15 lines of meaningful code (Article IV.1).
+- [ ] Add `python-docx 1.1.x` to `pyproject.toml` runtime deps (user approval required)
+- [ ] Add `beautifulsoup4 4.12.x` to `pyproject.toml` runtime deps (user approval required)
+- [ ] Run `uv lock` — commit updated `uv.lock`
+- [ ] Update `specs/tech-stack.md`: move `python-docx` and `beautifulsoup4` from "Phase 4 planned" to "active Phase 3"
 
 ---
 
-**Step 3 — Server**
+**Step 2 — New readers** _(TDD per file type)_
 
-- [ ] `src/agentrag/server/app.py` — FastAPI app with MCP SDK tool registration.
-      Transport priority: **stdio first** (Claude Desktop is the exit condition),
-      HTTP second. Both must function.
-- [ ] `agentrag serve` added to `cli.py` — starts the MCP server.
-- [ ] `tests/integration/test_server.py` — HTTP transport tests via
-      `pytest-asyncio` + `httpx`. Tests each of the 7 tools over HTTP.
-
----
-
-**Step 4 — Manual verification**
-
-- [ ] Claude Desktop integration: connect via stdio, call all 7 tools manually,
-      confirm correct responses for both happy-path and error inputs.
-
----
-
-**Exit condition:** All 7 MCP tools callable from Claude Desktop via stdio.
-`pytest` green. `mypy --strict` passes on `src/` with zero errors.
+- [ ] `tests/unit/test_reader.py` — extend with 4 new test cases, confirm red:
+      - `.docx` path → `RawDocument` with non-empty `text` and correct `filename`
+      - `.html` path → `RawDocument` with tag-stripped `text`
+      - `.py` path → `RawDocument` with raw source as `text`
+      - `.ipynb` path → `RawDocument` with all cell source text concatenated
+- [ ] `src/agentrag/ingestion/reader.py` — extend with 4 new branches:
+      - `.docx` via `python-docx`: iterate paragraphs, join with `\n`
+      - `.html` via `beautifulsoup4`: `BeautifulSoup.get_text(separator="\n")`
+      - `.py`: plain `read_text()` (same as `.txt` / `.md`)
+      - `.ipynb`: parse JSON, extract `source` from `code` and `markdown` cells
+- [ ] Run `uv run pytest tests/unit/test_reader.py` → green
+- [ ] Run `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
 
 ---
 
-## Phase 3 — Agentic Retrieval Loop
+**Step 3 — Extend `ingest_directory`**
 
-**Entry condition:** Phase 2 exit condition met.
+- [ ] `tests/unit/test_tools.py` — add test: `ingest_directory` with all 7 extension types calls pipeline per file
+- [ ] `src/agentrag/server/tools.py` — extend `ingest_directory` glob list:
+      `["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]`
+- [ ] Run `uv run pytest tests/unit/test_tools.py` → green
+
+---
+
+**Step 4 — Integration test**
+
+- [ ] `tests/integration/test_extended_ingestion.py` — real Qdrant, real files:
+      - Ingest `tests/fixtures/sample.docx` → `chunk_count > 0`
+      - Ingest `tests/fixtures/sample.html` → `chunk_count > 0`
+      - Ingest `tests/fixtures/sample.py` → `chunk_count > 0`
+      - `ingest_directory` on a mixed directory → all 7 types ingested
+      - Add fixture files (`sample.docx`, `sample.html`, `sample.py`) to `tests/fixtures/`
+
+---
+
+**Exit condition:** `agentrag ingest ./my-repo/` recursively ingests a mixed codebase.
+All 7 file types ingest without error. `pytest` green. `mypy --strict` passes on `src/`.
+
+---
+
+## Phase 4 — Agentic Retrieval Loop
+
+**Entry condition:** Phase 3 exit condition met.
 
 **Goal:** Transform AgentRAG from a passive RAG server into an active retrieval
 partner. Add three MCP tools that close the single-pass retrieval gap: query
@@ -112,10 +133,18 @@ Claude can decompose a complex question into sub-queries, search each
 independently, evaluate whether the results actually answer the question, and
 decide whether to re-search — all through tool calls, without special prompting.
 
+**Dependency:** Requires `AGENTRAG_GOOGLE_API_KEY` env var (free Google AI Studio key). Graceful degradation if key missing or API unreachable.
+
 ### Deliverables
 
 Deliverables follow strict TDD execution order. Test file written and
 confirmed failing before each implementation file is created.
+
+---
+
+**Step 0 — Context7 lookup** _(before any code)_
+
+- `google-genai` Python SDK — `Client`, `generate_content`, structured JSON output, error handling
 
 ---
 
@@ -149,15 +178,15 @@ class EvaluationReport:
 **Step 2 — Query planner**
 
 - [ ] `tests/unit/test_query_planner.py` ← write first, confirm red
-      (Ollama is mocked — no live model in unit tests)
+      (Gemini client is mocked — no live API calls in unit tests)
       - simple query → `QueryPlan` with `sub_queries = [original_query]`
       - compound query ("compare X and Y") → `sub_queries` has ≥ 2 items
-      - Ollama unavailable → degrades gracefully, returns single-item plan
+      - API key missing or Gemini unavailable → degrades gracefully, returns single-item plan
       - `original_query` always preserved in output
 - [ ] `src/agentrag/retrieval/query_planner.py` ← implement to make tests green
-      Calls Ollama HTTP API (`AGENTRAG_OLLAMA_URL`) to decompose the query.
+      Calls Gemini 2.0 Flash via `google-genai` SDK (`AGENTRAG_GOOGLE_API_KEY`).
       Prompt instructs the model to return a JSON list of sub-questions.
-      Graceful degradation: if Ollama is unreachable or returns invalid JSON,
+      Graceful degradation: if API key missing, quota exceeded, or response is invalid JSON,
       returns `QueryPlan(original_query, sub_queries=[original_query])`.
 
 ---
@@ -165,14 +194,14 @@ class EvaluationReport:
 **Step 3 — Chunk evaluator**
 
 - [ ] `tests/unit/test_evaluator.py` ← write first, confirm red
-      (Ollama mocked — no live model in unit tests)
+      (Gemini client mocked — no live API calls in unit tests)
       - all chunks score ≥ 0.7 → `sufficient = True`
       - all chunks score < 0.7 → `sufficient = False`, `suggested_queries` non-empty
       - empty chunk list → `sufficient = False`
       - each `ChunkScore.score` is in `[0.0, 1.0]`
 - [ ] `src/agentrag/retrieval/evaluator.py` ← implement to make tests green
-      Calls Ollama to score each chunk's relevance to the query.
-      Graceful degradation: if Ollama unavailable, scores all chunks at `0.5`
+      Calls Gemini 2.0 Flash to score each chunk's relevance to the query.
+      Graceful degradation: if API key missing or Gemini unavailable, scores all chunks at `0.5`
       and sets `sufficient = True` (pass-through — does not block retrieval).
 
 ---
@@ -194,45 +223,27 @@ class EvaluationReport:
         Thin delegate to `evaluator.evaluate`.
       - `plan_query(query: str) -> QueryPlan`
         Thin delegate to `query_planner.plan`.
+- [ ] Register all 3 new tools in `src/agentrag/server/app.py` via `@mcp.tool()` decorator,
+      same pattern as the 7 existing tools.
 
 ---
 
 **Step 5 — Integration**
 
-- [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Ollama optional:
+- [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Gemini optional:
       - ingest `sample.txt`, call `plan_query` → verify sub-queries are strings
       - call `search_multi` with 2 queries → result count ≤ `top_k`, no duplicates
       - call `evaluate_chunks` on results → `EvaluationReport` returned without error
       - full loop: `plan_query` → `search_multi` → `evaluate_chunks` → if not
         sufficient → `search_multi` with `suggested_queries` → verify second pass
         returns results
-      - Ollama absent: all three tools complete without raising (graceful degrade)
+      - `AGENTRAG_GOOGLE_API_KEY` absent: all three tools complete without raising (graceful degrade)
 
 ---
 
 **Exit condition:** `search_multi`, `evaluate_chunks`, and `plan_query` are
-callable from Claude Desktop. Full agentic loop test passes. Ollama degradation
+callable from Claude Desktop. Full agentic loop test passes. Gemini graceful-degrade
 verified. `pytest` green. `mypy --strict` passes.
-
----
-
-## Phase 4 — Extended File Support
-
-**Entry condition:** Phase 3 exit condition met.
-
-**Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
-`ingest_directory` to handle all supported types recursively.
-
-### Deliverables
-
-- [ ] `python-docx` added to dependencies (with approval)
-- [ ] `beautifulsoup4` added to dependencies (with approval)
-- [ ] `reader.py` extended: `.docx`, `.html`, `.py`, `.ipynb` readers
-- [ ] `ingest_directory` tool: recursive glob, per-extension filtering
-- [ ] `tests/unit/` — new reader tests for each file type
-- [ ] Update `specs/tech-stack.md` to move Phase 4 libs from "planned" to "active"
-
-**Exit condition:** `agentrag ingest ./my-repo/` recursively ingests a mixed codebase. `pytest` green.
 
 ---
 
@@ -240,26 +251,67 @@ verified. `pytest` green. `mypy --strict` passes.
 
 **Entry condition:** Phase 4 exit condition met.
 
-**Goal:** Improve retrieval precision. Add metadata-driven filtering, optional
-re-ranking, and deduplication on re-ingest.
+**Goal:** Improve retrieval precision. Activate the cross-encoder re-ranker stub
+(already stubbed in Phase 2 `reranker.py`), harden metadata filtering, and verify
+concurrent upsert safety. No new external services.
+
+**Dependency:** None. All improvements use existing stack.
 
 ### Deliverables
 
-- [ ] Metadata filter logic in `searcher.py` — all filter keys in
-      `search_documents` and `search_by_metadata` are applied correctly;
-      at least 3 filter fields covered by integration tests
-- [ ] Cross-encoder re-ranker in `reranker.py` — real implementation
-      (optional, activated via `AGENTRAG_RERANK=true` config flag);
-      identity reranker remains the default
-- [ ] Concurrent upsert safety: verify that re-ingesting the same file
-      from two simultaneous calls does not produce duplicate or corrupt
-      chunks (basic stress test, not a strict concurrency guarantee)
-- [ ] `search_by_metadata` tool fully functional with at least 3 filter fields
-- [ ] Benchmarks: retrieval quality tested on a sample corpus (results logged,
-      not gated on a score threshold)
+Deliverables follow strict TDD execution order.
 
-**Exit condition:** Metadata filters work end-to-end. Re-ranker activates via
-config. `pytest` green. `mypy --strict` passes.
+---
+
+**Step 0 — Context7 lookup** _(before any code)_
+
+- `sentence-transformers` — `CrossEncoder`, `predict`, score normalization API
+
+---
+
+**Step 1 — Metadata filter hardening**
+
+- [ ] `tests/integration/test_search_filters.py` — confirm red, then green:
+      - `search_documents` with `filters={"filename": X}` returns only chunks from X
+      - `search_by_metadata` with `{"source_id": X}` returns correct `SourceInfo`
+      - `search_by_metadata` with unknown key returns empty list, does not raise
+      - At least 3 distinct filter fields tested (filename, source_id, one metadata key)
+- [ ] Fix any gaps in `searcher.py` and `store/qdrant.py` filter logic found by the tests
+
+---
+
+**Step 2 — Cross-encoder re-ranker**
+
+- [ ] `tests/unit/test_reranker.py` — extend (currently empty; identity stub has no tests):
+      - `AGENTRAG_RERANK=false` → identity pass-through, no CrossEncoder loaded
+      - `AGENTRAG_RERANK=true` → results re-ordered by cross-encoder score descending
+      - CrossEncoder mocked in unit tests — no model download in CI
+- [ ] `src/agentrag/retrieval/reranker.py` — replace identity stub with real implementation:
+      - Load `CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")` when `settings.rerank=True`
+      - Identity pass-through when `settings.rerank=False` (zero overhead default)
+- [ ] `searcher.py` — pass results through `rerank()` after `store.query()`
+
+---
+
+**Step 3 — Concurrent upsert safety**
+
+- [ ] `tests/integration/test_concurrent_upsert.py`:
+      - Re-ingest `sample.txt` 3× concurrently via `threading.Thread`
+      - After all threads complete: `list_sources()` returns exactly 1 entry for that source
+      - `chunk_count` is stable (same value on every run)
+
+---
+
+**Step 4 — Benchmarks**
+
+- [ ] `scripts/benchmark_retrieval.py` — ingest sample corpus, run 10 queries,
+      log top-k results and scores. Exit 0. Not gated on score threshold.
+
+---
+
+**Exit condition:** Metadata filters pass integration tests with ≥3 fields. Re-ranker
+activates via `AGENTRAG_RERANK=true`. Concurrent upsert test passes. `pytest` green.
+`mypy --strict` passes.
 
 ---
 
@@ -272,15 +324,51 @@ running MCP server in under 60 seconds.
 
 ### Deliverables
 
-- [ ] `pyproject.toml` finalized for PyPI: classifiers, license, description, URLs
-- [ ] `agentrag serve` works via `uvx agentrag serve` (zero-install)
-- [ ] `README.md` with: 60-second quickstart, Claude Desktop config snippet, all CLI flags
-- [ ] GitHub Actions CI: established in Phase 1 — verify it is still green;
-      extend `.github/workflows/ci.yml` with matrix testing across Python 3.12+
-      if needed
-- [ ] GitHub Actions release workflow: add publish job to existing
-      `.github/workflows/ci.yml` triggered on version tag → PyPI publish
-- [ ] `CHANGELOG.md` with `v0.1.0` entry
-- [ ] PyPI package published and installable
+---
 
-**Exit condition:** `pip install agentrag && agentrag serve` works on a clean machine. CI is green.
+**Step 1 — Package metadata**
+
+- [ ] `pyproject.toml` finalized: classifiers, license (`MIT`), description, homepage URL,
+      `[project.urls]` with GitHub and docs links
+- [ ] Version pinned at `0.1.0` in `pyproject.toml`
+- [ ] `uv run python -m build` produces a clean wheel with no warnings
+
+---
+
+**Step 2 — Zero-install entry point**
+
+- [ ] `agentrag serve` works via `uvx agentrag serve` on a clean machine (no `pip install`)
+- [ ] Claude Desktop config snippet verified: `"command": "uvx", "args": ["agentrag", "serve"]`
+
+---
+
+**Step 3 — Documentation**
+
+- [ ] `README.md` with:
+      - 60-second quickstart (install → set `AGENTRAG_GOOGLE_API_KEY` → `agentrag serve`)
+      - Claude Desktop JSON config block (copy-paste ready)
+      - Full table of all CLI flags and env vars
+      - All 10 MCP tools listed with one-line descriptions
+- [ ] `CHANGELOG.md` with `v0.1.0` entry summarising all 5 phases
+
+---
+
+**Step 4 — CI hardening**
+
+- [ ] `.github/workflows/ci.yml` — extend with Python matrix: `[3.12, 3.13]`
+- [ ] GitHub Actions release workflow — new `publish` job triggered on `v*` tag push:
+      `uv build` → `uv publish` → PyPI
+
+---
+
+**Step 5 — Publish**
+
+- [ ] `git tag v0.1.0 && git push origin v0.1.0` → triggers CI publish job
+- [ ] `pip install agentrag` on a clean machine → `agentrag serve` starts without error
+- [ ] `uvx agentrag serve` on a clean machine → server starts without error
+
+---
+
+**Exit condition:** `pip install agentrag && agentrag serve` works on a clean machine.
+`uvx agentrag serve` works. CI matrix green across Python 3.12 and 3.13.
+PyPI package published at `https://pypi.org/project/agentrag/`.

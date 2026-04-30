@@ -22,7 +22,7 @@ conflict on any point, this file is authoritative for the duration of Phase 2.
 ### Out of Scope
 
 - No cross-encoder re-ranking (Phase 5)
-- No Ollama integration (Phase 3)
+- No Gemini integration (Phase 4)
 - No `.docx`, `.html`, `.py`, `.ipynb` ingestion (Phase 4) — `ingest_directory`
   supports Phase 1 file types only (`.pdf`, `.md`, `.txt`)
 - No authentication, rate limiting, or multi-user support
@@ -50,20 +50,21 @@ Article IV.1 — tools.py stays a thin delegate with no framework coupling.
 
 ## Locked Decision 2 — FastAPI App Structure
 
-- `server/app.py` exports a factory function `create_app(settings: Settings) -> FastAPI`.
+- `server/app.py` exports a factory function `create_app() -> tuple[FastAPI, FastMCP]`.
 - A lifespan context manager (`@asynccontextmanager`) initializes shared objects
-  (pipeline, searcher, store) at startup and cleans them up at shutdown.
-- Shared objects are stored on `app.state` so tool handlers can access them
-  without module-level globals.
-- HTTP/SSE transport is mounted at `/sse` (or the path the MCP SDK expects per
-  Context7 docs). Stdio transport bypasses FastAPI entirely and is run via the
-  MCP SDK's stdio runner.
+  (Settings, QdrantStore) at startup and yields an `AppContext` dataclass.
+- FastMCP instance is created with the lifespan hook: `mcp = FastMCP("AgentRAG", lifespan=app_lifespan)`.
+- Tool handlers are registered via `@mcp.tool()` decorator and return `dict[str, Any]`
+  for JSON serialization (not dataclass instances — FastMCP requires dict).
+- HTTP/SSE transport is mounted at `/sse` via `mcp.get_sse_app()`.
+- Stdio transport bypasses FastAPI and is run via `mcp.run(transport="stdio")`.
 - The FastAPI app has a single `/health` GET endpoint returning `{"status": "ok"}`
   for integration test readiness probing.
 
 **Why:** Factory function pattern allows integration tests to instantiate the app
-with a test `Settings` object (e.g., a temp data dir) without side effects at
-import time. Lifespan hook ensures resources are released on teardown.
+with isolated state. Lifespan hook ensures resources are initialized once and
+shared across all tool calls. FastMCP 1.27.0 requires dict return values, not
+dataclass instances.
 
 ---
 
@@ -80,10 +81,10 @@ Tool handlers in `tools.py` follow this error contract, which tests must assert:
 | Unknown `source_id` (`get_document`) | Raise `ValueError(f"source_id {source_id!r} not found")` |
 | Empty filters dict (`search_by_metadata`) | Raise `ValueError("filters must not be empty")` |
 
-**Serialization rule:** The MCP SDK serializes the return value of a tool handler
-to JSON automatically. Handlers must return dataclass instances (not raw dicts)
-so the SDK's serialization layer produces consistent output. `dataclasses.asdict`
-must not be called manually inside handlers.
+**Serialization rule:** Tool handlers registered with `@mcp.tool()` must return
+`dict[str, Any]`, not dataclass instances. Convert dataclass results to dict
+using `{"field": result.field, ...}` pattern. FastMCP 1.27.0 requires dict
+return values for JSON serialization.
 
 **Why:** Distinguishing "surfaced error" (returns a typed result) from "contract
 violation" (raises `ValueError`) matches the roadmap spec exactly and gives Claude

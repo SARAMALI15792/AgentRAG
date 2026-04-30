@@ -22,8 +22,8 @@ agentrag/
 │       │   ├── __init__.py
 │       │   ├── searcher.py         # query string → List[SearchResult]
 │       │   ├── reranker.py         # List[SearchResult] → List[SearchResult] (re-ranked)
-│       │   ├── query_planner.py    # str → QueryPlan (Ollama-backed, graceful degrade)
-│       │   └── evaluator.py        # (query, results) → EvaluationReport (Ollama-backed)
+│       │   ├── query_planner.py    # str → QueryPlan (Gemini-backed, graceful degrade)
+│       │   └── evaluator.py        # (query, results) → EvaluationReport (Gemini-backed)
 │       ├── store/
 │       │   ├── __init__.py
 │       │   └── qdrant.py           # all Qdrant interactions — no other module imports qdrant_client
@@ -386,8 +386,8 @@ server/tools.py
   └─▶ store/qdrant.py
 
 retrieval/searcher.py      ──▶ store/, ingestion/embedder.py (query embed only)
-retrieval/query_planner.py ──▶ (external: Ollama HTTP only)
-retrieval/evaluator.py     ──▶ (external: Ollama HTTP only)
+retrieval/query_planner.py ──▶ (external: google-genai SDK only)
+retrieval/evaluator.py     ──▶ (external: google-genai SDK only)
 ingestion/                 ──▶ store/
 
 store/ ──▶ (nothing internal — only qdrant_client)
