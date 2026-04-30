@@ -1,159 +1,280 @@
 # Phase 3 — Extended File Support — Execution Plan
 
-Execution order is strict. Each step must be complete and green before the next begins.
-TDD rule: test written and confirmed **red** before any implementation file is touched.
+Execution order is strict. Each step must complete before the next begins.
+Every implementation step is preceded by a failing test that specifies what
+the code must do. Tests prove the implementation — but the implementation is
+the deliverable.
 
 ---
 
 ## Step 0 — Context7 Lookups _(before any code)_
 
+Look up current API docs for the two new libraries before writing a single line.
+
 - [ ] Resolve Context7 library ID for `python-docx`
-- [ ] Query `python-docx` docs: `Document`, paragraph iteration, `paragraph.text` API
+- [ ] Query `python-docx` docs — topic: `"Document paragraph iteration text extraction"`
 - [ ] Resolve Context7 library ID for `beautifulsoup4`
-- [ ] Query `beautifulsoup4` docs: `BeautifulSoup`, `decompose()`, `get_text(separator=)` API
+- [ ] Query `beautifulsoup4` docs — topic: `"decompose get_text tag removal html.parser"`
 
 ---
 
 ## Step 1 — Dependencies
 
-- [ ] Obtain user approval to add `python-docx 1.1.x` to `[project.dependencies]`
-- [ ] Obtain user approval to add `beautifulsoup4 4.12.x` to `[project.dependencies]`
-- [ ] Add `python-docx>=1.1,<1.2` to `pyproject.toml` runtime deps
-- [ ] Add `beautifulsoup4>=4.12,<4.13` to `pyproject.toml` runtime deps
-- [ ] Run `uv lock` — verify `uv.lock` updates cleanly, no conflicts
-- [ ] Update `specs/tech-stack.md`: move both libs from "Phase 3 planned" notes to active runtime table row
+Add two new runtime dependencies and lock them.
+
+**What changes in `pyproject.toml`:**
+```toml
+[project.dependencies]
+# existing entries ...
+"python-docx>=1.1,<1.2",
+"beautifulsoup4>=4.12,<4.13",
+```
+
+**Steps:**
+- [ ] Obtain user approval for both additions (one AskUserQuestion call)
+- [ ] Add `python-docx>=1.1,<1.2` to `[project.dependencies]` in `pyproject.toml`
+- [ ] Add `beautifulsoup4>=4.12,<4.13` to `[project.dependencies]` in `pyproject.toml`
+- [ ] Run `uv lock` — verify `uv.lock` updates cleanly
+- [ ] Update `specs/tech-stack.md` runtime table: promote both from "Phase 3 planned" to active rows
 - [ ] Commit: `chore: add python-docx and beautifulsoup4 runtime dependencies`
 
 ---
 
-## Step 2 — New Readers _(TDD per file type)_
+## Step 2 — New Reader Helpers in `reader.py`
 
-### 2a — `.docx`
+### What we're building
 
-- [ ] `tests/unit/test_reader.py`: add `test_read_docx`
-      — `.docx` path → `RawDocument`
-      — `text` is non-empty string
-      — `filename` matches the fixture filename
-      — `source_id` is a 16-char hex string
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_docx` → confirm **red**
-- [ ] Create `tests/fixtures/sample.docx` via `python-docx`: ≥3 paragraphs, ≥50 words
-- [ ] `src/agentrag/ingestion/reader.py`: add `.docx` branch
-      — `Document(path)`, iterate `doc.paragraphs`, join `p.text` with `\n`
-      — skip empty paragraphs
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_docx` → **green**
+`src/agentrag/ingestion/reader.py` gets three new private helper functions and
+an extended dispatch block. The public function `read_file(path: Path) -> RawDocument`
+signature is **unchanged** — callers see no difference.
 
-### 2b — `.html`
+**New imports added at top of `reader.py`:**
+```python
+import json
+from bs4 import BeautifulSoup
+from docx import Document
+```
 
-- [ ] `tests/unit/test_reader.py`: add `test_read_html`
-      — `.html` path → `RawDocument`
-      — `text` contains no raw `<` or `>` characters
-      — boilerplate tag text (nav/header/footer/script/style contents) absent from `text`
-      — body content text present in `text`
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_html` → confirm **red**
-- [ ] Create `tests/fixtures/sample.html`: includes `<nav>`, `<header>`, `<footer>`,
-      `<script>`, `<style>`, and `<main>` with ≥3 paragraphs of body content
-- [ ] `src/agentrag/ingestion/reader.py`: add `.html` branch
-      — `BeautifulSoup(path.read_text(), "html.parser")`
-      — `.decompose()` on each of: `nav`, `header`, `footer`, `script`, `style`
-      — `soup.get_text(separator="\n", strip=True)`
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_html` → **green**
+**Three new private helpers:**
 
-### 2c — `.py`
+```python
+def _read_docx(path: Path) -> str:
+    """Extract paragraph text from a .docx file."""
+    doc = Document(path)
+    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
-- [ ] `tests/unit/test_reader.py`: add `test_read_py`
-      — `.py` path → `RawDocument`
-      — `text` equals raw file source (no transformation)
-      — `filename` ends with `.py`
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_py` → confirm **red**
-- [ ] Create `tests/fixtures/sample.py`: ≥3 functions with docstrings, ≥30 lines
-- [ ] `src/agentrag/ingestion/reader.py`: add `.py` branch
-      — plain `path.read_text(encoding="utf-8")`
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_py` → **green**
+def _read_html(path: Path) -> str:
+    """Extract body text from HTML, stripping nav/header/footer/script/style."""
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    for tag in soup.find_all(["nav", "header", "footer", "script", "style"]):
+        tag.decompose()
+    return soup.get_text(separator="\n", strip=True)
 
-### 2d — `.ipynb`
+def _read_ipynb(path: Path) -> str:
+    """Extract source text from code and markdown cells in a Jupyter notebook."""
+    nb = json.loads(path.read_text(encoding="utf-8"))
+    parts = [
+        "".join(cell["source"])
+        for cell in nb.get("cells", [])
+        if cell.get("cell_type") in {"code", "markdown"}
+    ]
+    return "\n\n".join(parts)
+```
 
-- [ ] `tests/unit/test_reader.py`: add `test_read_ipynb`
-      — `.ipynb` path → `RawDocument`
-      — text contains source from both `code` and `markdown` cell types
-      — text from a known markdown cell string is present in output
-      — text from a known code cell string is present in output
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_ipynb` → confirm **red**
-- [ ] Create `tests/fixtures/sample.ipynb`: valid JSON with 2 code cells + 2 markdown cells,
-      each cell `source` is a non-empty string
-- [ ] `src/agentrag/ingestion/reader.py`: add `.ipynb` branch
-      — `json.loads(path.read_text(encoding="utf-8"))`
-      — extract `"".join(cell["source"])` for each cell where
-        `cell["cell_type"] in {"code", "markdown"}`
-      — join all cell texts with `"\n\n"`
-- [ ] Run `uv run pytest tests/unit/test_reader.py::test_read_ipynb` → **green**
+**Extended dispatch in `read_file()`:**
+
+The existing suffix check expands from `{".pdf", ".txt", ".md"}` to include
+the four new types. `.py` needs no new helper — it reuses the existing
+`path.read_text(encoding="utf-8")` branch:
+
+```python
+# Before (Phase 2):
+if suffix not in {".pdf", ".txt", ".md"}:
+    raise ValueError(...)
+if suffix == ".pdf":
+    text = _read_pdf(path)
+else:
+    text = path.read_text(encoding="utf-8")
+
+# After (Phase 3):
+if suffix not in {".pdf", ".txt", ".md", ".docx", ".html", ".py", ".ipynb"}:
+    raise ValueError(...)
+if suffix == ".pdf":
+    text = _read_pdf(path)
+elif suffix == ".docx":
+    text = _read_docx(path)
+elif suffix == ".html":
+    text = _read_html(path)
+elif suffix == ".ipynb":
+    text = _read_ipynb(path)
+else:  # .txt, .md, .py — raw text
+    text = path.read_text(encoding="utf-8")
+```
+
+### 2a — `.docx` (TDD sequence)
+
+- [ ] Write `test_read_docx` in `tests/unit/test_reader.py` — assert `RawDocument.text`
+      is non-empty, `filename` matches, `source_id` is 16-char hex
+- [ ] Run → confirm **red** (`.docx` branch doesn't exist yet)
+- [ ] Create `tests/fixtures/sample.docx` programmatically using `python-docx`:
+      3 paragraphs of real prose, one empty paragraph to verify filtering
+- [ ] Implement `_read_docx()` and add `.docx` branch to `read_file()`
+- [ ] Run → confirm **green**
+
+### 2b — `.html` (TDD sequence)
+
+- [ ] Write `test_read_html` in `tests/unit/test_reader.py` — assert no `<`/`>` chars,
+      nav/script/style sentinel strings absent, body content present
+- [ ] Run → confirm **red**
+- [ ] Create `tests/fixtures/sample.html`: contains `<nav>NAVTEXT</nav>`,
+      `<script>SCRIPTTEXT</script>`, `<style>STYLETEXT</style>`, `<header>HEADERTEXT</header>`,
+      `<footer>FOOTERTEXT</footer>`, and `<main><p>BODYTEXT paragraph one.</p></main>`
+      (sentinel strings make assertions unambiguous)
+- [ ] Implement `_read_html()` and add `.html` branch
+- [ ] Run → confirm **green**
+
+### 2c — `.py` (TDD sequence)
+
+- [ ] Write `test_read_py` in `tests/unit/test_reader.py` — assert `text` equals
+      exact raw source of fixture (no transformation whatsoever)
+- [ ] Run → confirm **red** (`.py` not in supported set yet)
+- [ ] Create `tests/fixtures/sample.py`: 3 functions with docstrings, ≥30 lines
+- [ ] Add `.py` to the supported suffix set in `read_file()` — no new helper needed,
+      falls through to the existing `path.read_text(encoding="utf-8")` branch
+- [ ] Run → confirm **green**
+
+### 2d — `.ipynb` (TDD sequence)
+
+- [ ] Write `test_read_ipynb` in `tests/unit/test_reader.py` — assert known code cell
+      string present in output, known markdown cell string present in output,
+      `cell_type=="raw"` content absent
+- [ ] Run → confirm **red**
+- [ ] Create `tests/fixtures/sample.ipynb`: valid JSON, 2 code cells + 2 markdown cells
+      + 1 raw cell with a unique sentinel string (to assert exclusion)
+- [ ] Implement `_read_ipynb()` and add `.ipynb` branch
+- [ ] Run → confirm **green**
 
 ### 2e — Full reader suite
 
-- [ ] Run `uv run pytest tests/unit/test_reader.py` → **all tests green**
-- [ ] Run `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
+- [ ] `uv run pytest tests/unit/test_reader.py` → all tests green (old + 4 new)
+- [ ] `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
 - [ ] Commit: `feat: extend reader with docx, html, py, ipynb support`
 
 ---
 
-## Step 3 — Extend `ingest_directory`
+## Step 3 — Extend `ingest_directory` in `tools.py`
 
-- [ ] `tests/unit/test_tools.py`: add `test_ingest_directory_all_types`
-      — mock pipeline, directory contains one file of each of 7 types
-      — verify `pipeline.ingest_file` called once per file
-      — verify no file is silently skipped
-- [ ] Run `uv run pytest tests/unit/test_tools.py::test_ingest_directory_all_types` → confirm **red**
-- [ ] `src/agentrag/server/tools.py`: extend `ingest_directory` glob list to include
-      `*.docx`, `*.html`, `*.py`, `*.ipynb` alongside existing `*.txt`, `*.md`, `*.pdf`
-- [ ] Run `uv run pytest tests/unit/test_tools.py` → **all tests green**
-- [ ] Run `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
+### What we're building
+
+One line changes in `src/agentrag/server/tools.py`. The `ingest_directory` handler's
+glob list expands from 3 to 7 extensions. No new logic, no new functions.
+
+```python
+# Before (Phase 2):
+for ext in ["*.txt", "*.md", "*.pdf"]:
+
+# After (Phase 3):
+for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
+```
+
+The handler stays ≤15 lines (Article IV.1). The stale comment `# Phase 2: only ...`
+is removed — no task-tracking comments in source (Article III.3).
+
+### TDD sequence
+
+- [ ] Write `test_ingest_directory_all_types` in `tests/unit/test_tools.py`:
+      mock pipeline + a temp directory containing one file of each of 7 extensions,
+      assert `ingest()` called exactly 7 times (once per file, none skipped)
+- [ ] Run → confirm **red** (only 3 types currently globbed)
+- [ ] Update the glob list in `ingest_directory`; remove stale Phase 2 comment
+- [ ] Run → confirm **green**
+- [ ] `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
 - [ ] Commit: `feat: extend ingest_directory to support all 7 file types`
 
 ---
 
 ## Step 4 — Integration Tests
 
-- [ ] Create `tests/integration/test_extended_ingestion.py` with 5 tests:
+### What we're building
 
-  - `test_ingest_docx`
-    — real embedded Qdrant, ingest `tests/fixtures/sample.docx`
-    — `IngestResult.chunk_count > 0`, `status == "ok"`
+`tests/integration/test_extended_ingestion.py` — 5 tests against a real embedded
+Qdrant instance. These tests verify the full pipeline (reader → chunker → embedder →
+store) for each new type, not just the reader in isolation.
 
-  - `test_ingest_html`
-    — real embedded Qdrant, ingest `tests/fixtures/sample.html`
-    — `chunk_count > 0`
-    — search results for body content text returns ≥1 result
-    — nav/script/style text does NOT appear in any `SearchResult.text`
+**Test: `test_ingest_docx`**
+- Ingest `tests/fixtures/sample.docx` via `ingest(path, settings)`
+- Assert `IngestResult.status == "ok"`, `chunk_count > 0`
 
-  - `test_ingest_py`
-    — real embedded Qdrant, ingest `tests/fixtures/sample.py`
-    — `chunk_count > 0`, function names from fixture present in at least one chunk
+**Test: `test_ingest_html`**
+- Ingest `tests/fixtures/sample.html`
+- Assert `chunk_count > 0`
+- Call `search_documents("BODYTEXT")` → ≥1 result
+- Assert no `SearchResult.text` contains "NAVTEXT", "SCRIPTTEXT", or "STYLETEXT"
+  (proves boilerplate was stripped before chunking, not just in unit test)
 
-  - `test_ingest_ipynb`
-    — real embedded Qdrant, ingest `tests/fixtures/sample.ipynb`
-    — `chunk_count > 0`
-    — known markdown cell string present in at least one `SearchResult.text`
+**Test: `test_ingest_py`**
+- Ingest `tests/fixtures/sample.py`
+- Assert `chunk_count > 0`
+- Assert at least one chunk contains a known function name from the fixture
 
-  - `test_ingest_directory_mixed`
-    — real embedded Qdrant, `ingest_directory` on `tests/fixtures/`
-    — returns 7 `IngestResult` entries (one per type)
-    — every result has `status == "ok"` and `chunk_count > 0`
+**Test: `test_ingest_ipynb`**
+- Ingest `tests/fixtures/sample.ipynb`
+- Assert `chunk_count > 0`
+- Assert at least one chunk contains the known markdown cell sentinel string
 
-- [ ] Run `uv run pytest tests/integration/test_extended_ingestion.py` → **all green**
-- [ ] Run full suite `uv run pytest --tb=short` → zero failures
-- [ ] Run `uv run mypy --strict src/` → zero errors
-- [ ] Invoke `coderabbit:code-review` on all new/changed files; resolve all blocking issues
+**Test: `test_ingest_directory_mixed`**
+- Call `ingest_directory` on `tests/fixtures/` (contains all 7 types)
+- Assert 7 `IngestResult` entries returned, all `status == "ok"`, all `chunk_count > 0`
+
+### Steps
+
+- [ ] Create `tests/integration/test_extended_ingestion.py` with the 5 tests above
+- [ ] `uv run pytest tests/integration/test_extended_ingestion.py` → all green
+- [ ] `uv run pytest --tb=short` (full suite) → zero failures
+- [ ] `uv run mypy --strict src/` → zero errors
+- [ ] Invoke `coderabbit:code-review` on all changed files; resolve blocking issues
 - [ ] Commit: `test: integration tests for extended file ingestion`
 
 ---
 
 ## Step 5 — Exit Gate Script
 
-- [ ] Create `scripts/verify_phase3.sh`:
-      - `set -e`
-      - `uv run pytest --tb=short`
-      - `uv run mypy --strict src/`
-      - ingest each of 7 fixture files via `agentrag ingest` CLI, assert exit 0
-- [ ] Run `bash scripts/verify_phase3.sh` → exit 0
+### What we're building
+
+`scripts/verify_phase3.sh` — a runnable, deterministic exit gate. Same pattern
+as `scripts/verify_phase1.sh`. Exits 0 only when all checks pass.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== Phase 3 exit gate ==="
+
+echo "--- pytest ---"
+uv run pytest --tb=short
+
+echo "--- mypy ---"
+uv run mypy --strict src/
+
+echo "--- CLI smoke: all 7 file types ---"
+for f in tests/fixtures/sample.txt \
+          tests/fixtures/sample.md  \
+          tests/fixtures/sample.pdf \
+          tests/fixtures/sample.docx \
+          tests/fixtures/sample.html \
+          tests/fixtures/sample.py   \
+          tests/fixtures/sample.ipynb; do
+    agentrag ingest "$f"
+    echo "  ingested: $f"
+done
+
+echo "=== Phase 3 exit gate PASSED ==="
+```
+
+### Steps
+
+- [ ] Create `scripts/verify_phase3.sh` with the above content
+- [ ] `bash scripts/verify_phase3.sh` → exits 0
 - [ ] Commit: `chore: add verify_phase3.sh exit gate script`
 
 ---
@@ -162,5 +283,6 @@ TDD rule: test written and confirmed **red** before any implementation file is t
 
 - [ ] `git push origin phase/3-extended-file-support`
 - [ ] Open PR: `phase/3-extended-file-support` → `main`
-- [ ] Title: `Phase 3: Extended File Support (.docx, .html, .py, .ipynb)`
-- [ ] CI green on PR branch before merge
+- [ ] PR title: `Phase 3: Extended File Support (.docx, .html, .py, .ipynb)`
+- [ ] CI green on branch before merge
+- [ ] After merge: update `specs/roadmap.md` Phase 3 entry to `COMPLETE`
