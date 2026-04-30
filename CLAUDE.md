@@ -500,9 +500,17 @@ than a premature abstraction. A concrete implementation is better than a
 pluggable system nobody has asked for yet.
 
 The vector store abstraction (`store/qdrant.py`) exists because swappability
-is an explicit project goal stated in `specs/mission.md`. All other
-abstractions must justify themselves against a concrete, current requirement —
-not a hypothetical future one.
+is an explicit project goal stated in `specs/mission.md`. The reader plugin
+registry (Article XIV) exists because the roadmap commits to 15+ file types.
+All other abstractions must justify themselves against a concrete, current
+requirement — not a hypothetical future one.
+
+### IV.6 Reader Plugin Registry
+
+All file readers must register through `src/agentrag/ingestion/reader_registry.py`.
+See Article XIV for the full specification. This rule takes effect starting
+Phase 3B. Until then, the existing `if/elif` chain in `reader.py` remains
+valid for Tier 1 readers.
 
 ---
 
@@ -592,7 +600,7 @@ each file and its authority.
 |------|-----------|----------|
 | `specs/mission.md` | Defines **why** this project exists | Core goals, non-goals, design principles. Use this to evaluate whether a proposed feature belongs in this project. |
 | `specs/tech-stack.md` | Defines **what tools** are permitted | Approved libraries with locked versions, explicitly excluded libraries, environment variables. Use this before adding any dependency. |
-| `specs/roadmap.md` | Defines **what to build and when** | Five phases with entry conditions, concrete deliverables, and exit conditions. Use this to determine what is in scope for the current phase. |
+| `specs/roadmap.md` | Defines **what to build and when** | Eight phases (1–8, with 3A/3B/3C sub-phases) with entry conditions, concrete deliverables, and exit conditions. Use this to determine what is in scope for the current phase. |
 | `specs/architecture.md` | Defines **how the system is structured** | Directory layout, domain types, data flows, MCP tool contracts, dependency direction, Claude Desktop integration. Use this before writing any new module or function. |
 
 ### Out-of-Scope Work
@@ -816,6 +824,10 @@ verify:
 - [ ] No new dependency was added without appearing in `specs/tech-stack.md` (Article IV.3).
 - [ ] No human-written code entered the codebase (Article VIII).
 - [ ] `coderabbit:code-review` run and all blocking issues resolved (Article III.7).
+- [ ] Phase verify script passes (Article XI).
+- [ ] Performance targets not regressed (Article XII).
+- [ ] All errors are actionable — no bare exceptions or generic messages (Article XIII).
+- [ ] New readers registered via plugin registry, not hardcoded (Article XIV).
 - [ ] Changes committed and pushed to `github.com/SARAMALI15792/AgentRAG` (Article IX).
 
 ### X.2 Violations
@@ -829,3 +841,262 @@ If Claude detects that it has violated any article of this constitution:
 
 Self-detected violations are not failures — they are the constitution working
 as intended. The failure would be continuing after detecting a violation.
+
+---
+
+## Article XI — Phase Exit Gates — Mandatory Verification
+
+### XI.1 The Rule
+
+**No phase may be declared complete without its verify script exiting 0.**
+
+Every roadmap phase (3B, 3C, 4, 5, 6, 7, 8) has a dedicated exit gate script
+in `scripts/verify_phase{N}.sh`. This script is the authoritative arbiter of
+phase completion — not human judgment, not passing tests alone, not "it looks
+done."
+
+### XI.2 Verify Script Requirements
+
+Every verify script must execute the following checks in order. If any check
+fails, the script exits non-zero and the phase is not complete.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== Phase {N} Exit Gate ==="
+
+# 1. Formatting
+echo "[1/5] Black..."
+uv run black --check .
+
+# 2. Linting
+echo "[2/5] Ruff..."
+uv run ruff check .
+
+# 3. Type checking
+echo "[3/5] Mypy..."
+uv run mypy --strict src/
+
+# 4. Full test suite
+echo "[4/5] Pytest..."
+uv run pytest --tb=short -q
+
+# 5. Phase-specific smoke tests (varies per phase)
+echo "[5/5] Phase-specific checks..."
+# ... phase-specific commands here ...
+
+echo "=== Phase {N} Exit Gate: PASSED ==="
+```
+
+### XI.3 Phase-Specific Checks
+
+Each phase's verify script includes checks specific to that phase's
+deliverables. Examples:
+
+| Phase | Phase-specific check |
+|-------|---------------------|
+| 3B | Ingest one file of each new type (xlsx, pptx, csv, epub, json, yaml, xml, toml) via CLI |
+| 3C | Ingest a URL via CLI, ingest an .srt file |
+| 4 | Call `plan_query`, `search_multi`, `evaluate_chunks` via test harness |
+| 5 | Run benchmark script, verify reranker activates with `AGENTRAG_RERANK=true` |
+| 6 | `uv run python -m build` produces clean wheel |
+| 7 | Create, switch, and list collections via test harness |
+| 8 | `agentrag sync push` + `agentrag sync pull` roundtrip |
+
+### XI.4 PR Merge Gating
+
+A pull request for a phase branch (`phase/{n}-{slug}`) must not be merged
+until the corresponding verify script passes in CI. The CI workflow runs
+the verify script as the final step. If it fails, the PR is blocked.
+
+### XI.5 Creating Verify Scripts
+
+Verify scripts are created at the **start** of each phase, before any
+implementation begins. They are part of the phase's replan deliverables
+(Article V.5 phase execution subdirectories). Writing the exit gate first
+ensures the phase's success criteria are concrete and testable from day one.
+
+---
+
+## Article XII — Performance Standards
+
+### XII.1 The Rule
+
+**AgentRAG must meet defined performance targets for ingestion and retrieval.**
+
+Performance is not optional and not deferred to "optimization later." The
+system handles large corpora (10,000+ documents) as a first-class use case.
+Performance regressions are treated with the same severity as test failures.
+
+### XII.2 Ingestion Targets
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Single file (< 1MB) | < 5 seconds | Wall clock, reader → store.upsert complete |
+| Single file (< 10MB) | < 30 seconds | Wall clock, reader → store.upsert complete |
+| Timeout per file | 300 seconds (configurable) | `AGENTRAG_INGEST_TIMEOUT` env var |
+| Max file size | 100 MB (configurable) | `AGENTRAG_MAX_FILE_SIZE_MB` env var. Reject with actionable error. |
+| Directory (100 files) | < 5 minutes | All files ingested, no hang |
+
+### XII.3 Retrieval Targets
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Single query (top-5) | < 1 second | Query embed + Qdrant search + rerank |
+| Agentic loop (plan + search_multi + evaluate) | < 10 seconds | Full loop with Gemini calls |
+| Agentic loop without Gemini | < 2 seconds | Graceful degrade path |
+
+### XII.4 Benchmark Script
+
+`scripts/benchmark_retrieval.py` (Phase 5) measures these targets against a
+sample corpus. It logs results but does not gate on thresholds — the targets
+are guidelines, not hard CI gates. If a target is consistently missed, it
+is investigated and either the code is optimized or the target is revised
+with user approval.
+
+### XII.5 Memory and Resource Limits
+
+- Qdrant embedded mode keeps vectors in memory. For corpora exceeding
+  available RAM, the system must degrade gracefully (slower disk-backed
+  queries) rather than crash.
+- Embedding model loading is done once per session, not per query. The
+  `SentenceTransformer` instance must be cached (currently re-created per
+  call — this is a known issue to fix in Phase 5).
+
+---
+
+## Article XIII — Error Handling Laws
+
+### XIII.1 The Rule
+
+**Every error the user sees must tell them what went wrong and how to fix it.**
+
+Bare exceptions, generic error messages, and silent failures are forbidden.
+Every error path must produce an actionable message that a non-expert user
+can act on without reading source code.
+
+### XIII.2 Error Message Format
+
+All user-facing errors must include:
+
+1. **What happened** — a plain-language description of the failure.
+2. **Why it happened** — the specific condition that triggered the error.
+3. **How to fix it** — a concrete action the user can take.
+
+Examples:
+
+```
+BAD:  "Error: unsupported file type"
+GOOD: "Unsupported file type: .xlsx. Install office support with: pip install agentrag[office]"
+
+BAD:  "Connection error"
+GOOD: "Cannot reach Gemini API. Check AGENTRAG_GOOGLE_API_KEY in .env or run without agentic features."
+
+BAD:  "File too large"
+GOOD: "File exceeds 100MB limit (got 234MB). Set AGENTRAG_MAX_FILE_SIZE_MB=300 to increase, or split the file."
+```
+
+### XIII.3 Graceful Degradation
+
+When a non-critical component fails (Gemini API, optional dependency,
+network), the system must:
+
+1. Log the error at `WARNING` level with full context.
+2. Fall back to the degraded path (e.g., single-query plan, identity reranker).
+3. Include a note in the response indicating degraded mode is active.
+4. Never block the core retrieval pipeline.
+
+### XIII.4 Never Swallow Exceptions
+
+The `pipeline.py` catch-all (`except Exception as e`) is the **only**
+permitted broad exception handler. It exists because the pipeline must never
+raise — it returns `IngestResult(status="error")` instead. All other modules
+must:
+
+- Catch specific exceptions only.
+- Re-raise or wrap with context if catching broadly.
+- Never use bare `except:` (catches `SystemExit`, `KeyboardInterrupt`).
+- Never use `pass` in an `except` block without logging.
+
+### XIII.5 Optional Dependency Errors
+
+When a reader requires an optional dependency that is not installed:
+
+```python
+try:
+    import openpyxl
+except ImportError:
+    raise ImportError(
+        "openpyxl is required for .xlsx support. "
+        "Install it with: pip install agentrag[office]"
+    ) from None
+```
+
+This pattern is mandatory for all optional-dependency readers (office, ebook,
+web, media). The error message must name the exact pip install command.
+
+---
+
+## Article XIV — Reader Plugin Architecture
+
+### XIV.1 The Rule
+
+**New file type support is added by registering a reader function — not by
+modifying core pipeline code.**
+
+Starting in Phase 3B, all file readers register through the reader plugin
+registry defined in `src/agentrag/ingestion/reader_registry.py`. This is
+the sole justified exception to Article IV.5 (no premature abstraction) —
+the roadmap commits to 15+ file types, making a registry pattern the correct
+architectural choice.
+
+### XIV.2 Reader Function Contract
+
+Every reader function must satisfy this contract:
+
+```python
+def read_<format>(path: Path) -> str:
+    """Extract text content from a <format> file."""
+    # Returns: plain text string suitable for chunking
+    # Raises: ValueError if file is empty after extraction
+    # Raises: ImportError with actionable message if optional dep missing
+```
+
+| Rule | Detail |
+|------|--------|
+| Signature | `(Path) -> str` — takes a file path, returns extracted text |
+| Return | Non-empty string. If extraction produces empty text, raise `ValueError` |
+| Dependencies | Reader may import optional libraries. Must catch `ImportError` (Article XIII.5) |
+| Side effects | None. Readers are pure functions. No file writes, no network calls (except URL reader), no state mutation |
+| Imports | May only import from `agentrag.types` (if needed). No other internal imports. Leaf modules. |
+
+### XIV.3 Registration
+
+```python
+# In each reader module (e.g., readers/office.py):
+from agentrag.ingestion.reader_registry import register
+
+register([".xlsx"], read_xlsx)
+register([".pptx"], read_pptx)
+register([".csv"], read_csv)
+```
+
+Registration happens at module import time. The registry lazily imports reader
+modules to avoid loading unused optional dependencies.
+
+### XIV.4 Adding a New File Type
+
+To add support for a new file type, a developer (Claude) must:
+
+1. Write failing tests in `tests/unit/test_reader.py` for the new extension.
+2. Create a reader function in the appropriate `readers/` module.
+3. Call `register([".ext"], read_ext)` in that module.
+4. Add the extension to `ingest_directory`'s glob list (or it picks up from
+   `reader_registry.supported_extensions()` automatically).
+5. Add a test fixture file to `tests/fixtures/`.
+6. If the reader requires an external library, add it as an optional
+   dependency group in `pyproject.toml` and update `specs/tech-stack.md`.
+
+No changes to `reader.py`, `pipeline.py`, `chunker.py`, `embedder.py`, or
+`store/qdrant.py` are required. This is the architectural invariant.

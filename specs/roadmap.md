@@ -49,13 +49,31 @@ Phases are not time-boxed — they are scope-boxed.
 
 ---
 
-## Phase 3 — Extended File Support
+## Phase 3A — Extended File Support — COMPLETE
 
-**Entry condition:** Phase 2 exit condition met.
+**Completed:** 2026-04-30 | **Branch:** `phase/3-extended-file-support`
 
-**Goal:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
-`ingest_directory` to handle all supported types recursively. No new
-external services — pure reader extensions.
+**Goal achieved:** Support `.docx`, `.html`, `.py`, `.ipynb` ingestion. Extend
+`ingest_directory` to handle all supported types recursively.
+
+**Shipped:**
+- `python-docx` and `beautifulsoup4` added to runtime deps
+- `reader.py` extended with 4 new branches (docx, html, py, ipynb)
+- `ingest_directory` glob list extended to 7 types
+- Test fixtures: `sample.docx`, `sample.html`, `sample.py`, `sample.ipynb`
+- Unit tests + integration tests for all new file types
+
+**Exit condition met:** All 7 file types ingest without error. `pytest` green. `mypy --strict` passes.
+
+---
+
+## Phase 3B — Office, eBook, and Structured Data Support
+
+**Entry condition:** Phase 3A exit condition met.
+
+**Goal:** Support `.xlsx`, `.pptx`, `.csv`, `.epub`, `.mobi`, `.json`,
+`.yaml`, `.xml`, `.toml` ingestion. All new readers register through the
+reader plugin registry (Article IV.6). No new external services.
 
 ### Deliverables
 
@@ -66,65 +84,161 @@ confirmed failing before each implementation file is created.
 
 **Step 0 — Context7 lookups** _(before any code)_
 
-- `python-docx` — `Document`, paragraph iteration API
-- `beautifulsoup4` — `BeautifulSoup`, tag extraction, `get_text()`
+- `openpyxl` — `load_workbook`, sheet iteration, cell value extraction
+- `python-pptx` — `Presentation`, slide iteration, text frame extraction
+- `ebooklib` — `epub.read_epub`, item iteration, XHTML content
+- `PyYAML` — `safe_load`, `dump`
 
 ---
 
 **Step 1 — Dependencies**
 
-- [ ] Add `python-docx 1.1.x` to `pyproject.toml` runtime deps (user approval required)
-- [ ] Add `beautifulsoup4 4.12.x` to `pyproject.toml` runtime deps (user approval required)
+- [ ] Add `openpyxl 3.1.x` to `pyproject.toml` under `[project.optional-dependencies] office`
+- [ ] Add `python-pptx 1.0.x` to `pyproject.toml` under `[project.optional-dependencies] office`
+- [ ] Add `ebooklib 0.18.x` to `pyproject.toml` under `[project.optional-dependencies] ebooks`
+- [ ] Add `mobi 0.3.x` to `pyproject.toml` under `[project.optional-dependencies] ebooks`
+- [ ] Add `PyYAML 6.x` to `pyproject.toml` runtime deps
 - [ ] Run `uv lock` — commit updated `uv.lock`
-- [ ] Update `specs/tech-stack.md`: move `python-docx` and `beautifulsoup4` from "Phase 4 planned" to "active Phase 3"
 
 ---
 
-**Step 2 — New readers** _(TDD per file type)_
+**Step 2 — Reader plugin registry** _(architectural prerequisite)_
 
-- [ ] `tests/unit/test_reader.py` — extend with 4 new test cases, confirm red:
-      - `.docx` path → `RawDocument` with non-empty `text` and correct `filename`
-      - `.html` path → `RawDocument` with tag-stripped `text`
-      - `.py` path → `RawDocument` with raw source as `text`
-      - `.ipynb` path → `RawDocument` with all cell source text concatenated
-- [ ] `src/agentrag/ingestion/reader.py` — extend with 4 new branches:
-      - `.docx` via `python-docx`: iterate paragraphs, join with `\n`
-      - `.html` via `beautifulsoup4`: `BeautifulSoup.get_text(separator="\n")`
-      - `.py`: plain `read_text()` (same as `.txt` / `.md`)
-      - `.ipynb`: parse JSON, extract `source` from `code` and `markdown` cells
-- [ ] Run `uv run pytest tests/unit/test_reader.py` → green
-- [ ] Run `uv run black . && uv run ruff check . && uv run mypy --strict src/` → zero errors
+- [ ] `tests/unit/test_reader_registry.py` — test plugin registration, lookup, error on unknown ext
+- [ ] `src/agentrag/ingestion/reader_registry.py` — registry dict mapping extensions to reader callables
+- [ ] Refactor `reader.py` to use registry instead of if/elif chain
+- [ ] All existing readers registered automatically on import
 
 ---
 
-**Step 3 — Extend `ingest_directory`**
+**Step 3 — Office readers** _(TDD per file type)_
 
-- [ ] `tests/unit/test_tools.py` — add test: `ingest_directory` with all 7 extension types calls pipeline per file
-- [ ] `src/agentrag/server/tools.py` — extend `ingest_directory` glob list:
-      `["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]`
+- [ ] `tests/unit/test_reader.py` — extend with `.xlsx`, `.pptx`, `.csv` test cases, confirm red
+- [ ] `src/agentrag/ingestion/readers/office.py`:
+      - `.xlsx` via `openpyxl`: iterate sheets → rows → cells, join as text
+      - `.pptx` via `python-pptx`: iterate slides → shapes → text frames
+      - `.csv` via stdlib `csv`: header + rows as text lines
+- [ ] Register in reader registry
+
+---
+
+**Step 4 — eBook readers** _(TDD per file type)_
+
+- [ ] `tests/unit/test_reader.py` — extend with `.epub`, `.mobi` test cases, confirm red
+- [ ] `src/agentrag/ingestion/readers/ebooks.py`:
+      - `.epub` via `ebooklib`: extract XHTML chapters → BeautifulSoup → text
+      - `.mobi` via `mobi`: convert to HTML → BeautifulSoup → text
+- [ ] Register in reader registry
+
+---
+
+**Step 5 — Structured data readers** _(TDD per file type)_
+
+- [ ] `tests/unit/test_reader.py` — extend with `.json`, `.yaml`, `.xml`, `.toml` test cases, confirm red
+- [ ] `src/agentrag/ingestion/readers/structured.py`:
+      - `.json` via stdlib: pretty-print as text
+      - `.yaml` via PyYAML: `safe_load` → `dump` as text
+      - `.xml` via stdlib `xml.etree`: extract all text content
+      - `.toml` via stdlib `tomllib`: load → dump as text
+- [ ] Register in reader registry
+
+---
+
+**Step 6 — Extend `ingest_directory`**
+
+- [ ] `tests/unit/test_tools.py` — add test: `ingest_directory` with all extension types
+- [ ] `src/agentrag/server/tools.py` — extend glob list with all new extensions
 - [ ] Run `uv run pytest tests/unit/test_tools.py` → green
 
 ---
 
-**Step 4 — Integration test**
+**Step 7 — Integration test**
 
-- [ ] `tests/integration/test_extended_ingestion.py` — real Qdrant, real files:
-      - Ingest `tests/fixtures/sample.docx` → `chunk_count > 0`
-      - Ingest `tests/fixtures/sample.html` → `chunk_count > 0`
-      - Ingest `tests/fixtures/sample.py` → `chunk_count > 0`
-      - `ingest_directory` on a mixed directory → all 7 types ingested
-      - Add fixture files (`sample.docx`, `sample.html`, `sample.py`) to `tests/fixtures/`
+- [ ] `tests/integration/test_extended_ingestion_3b.py` — real Qdrant, real files:
+      - Ingest one fixture file per new type → `chunk_count > 0`
+      - `ingest_directory` on mixed directory → all types ingested
+      - Add fixture files to `tests/fixtures/`
 
 ---
 
-**Exit condition:** `agentrag ingest ./my-repo/` recursively ingests a mixed codebase.
-All 7 file types ingest without error. `pytest` green. `mypy --strict` passes on `src/`.
+**Step 8 — Exit gate**
+
+- [ ] `scripts/verify_phase3b.sh` — pytest + mypy + all new file types ingest successfully
+
+**Exit condition:** All 16 file types ingest without error. Reader plugin
+registry works. `pytest` green. `mypy --strict` passes.
+
+---
+
+## Phase 3C — Web & Media Ingestion
+
+**Entry condition:** Phase 3B exit condition met.
+
+**Goal:** Support URL ingestion (web pages), subtitle files (`.srt`, `.vtt`),
+and email files (`.eml`, `.mbox`). URL ingestion promotes `httpx` from dev
+to optional runtime dependency.
+
+### Deliverables
+
+---
+
+**Step 1 — Dependencies**
+
+- [ ] Add `pysrt 1.1.x` to `pyproject.toml` optional `web` group
+- [ ] Add `webvtt-py 0.5.x` to `pyproject.toml` optional `web` group
+- [ ] Move `httpx` to both dev and optional `web` runtime dep
+- [ ] Run `uv lock`
+
+---
+
+**Step 2 — URL reader**
+
+- [ ] `tests/unit/test_url_reader.py` — mock HTTP responses, confirm red then green
+- [ ] `src/agentrag/ingestion/readers/web.py`:
+      - Fetch URL via `httpx` → BeautifulSoup → text (reuse `_read_html` logic)
+      - Timeout, status code handling, redirect following
+      - Register `url://` scheme in reader registry
+
+---
+
+**Step 3 — Subtitle readers**
+
+- [ ] `tests/unit/test_reader.py` — extend with `.srt`, `.vtt` test cases
+- [ ] `src/agentrag/ingestion/readers/media.py`:
+      - `.srt` via `pysrt`: extract timestamped text segments
+      - `.vtt` via `webvtt-py`: extract cue text
+
+---
+
+**Step 4 — Email readers**
+
+- [ ] `tests/unit/test_reader.py` — extend with `.eml`, `.mbox` test cases
+- [ ] `src/agentrag/ingestion/readers/email.py`:
+      - `.eml` via stdlib `email`: parse headers + body text
+      - `.mbox` via stdlib `mailbox`: iterate messages → text
+
+---
+
+**Step 5 — New MCP tool: `ingest_url`**
+
+- [ ] `tests/unit/test_tools.py` — add `ingest_url` test
+- [ ] Add `ingest_url(url: str, metadata: dict) -> IngestResult` tool handler
+- [ ] Register in `app.py`
+
+---
+
+**Step 6 — Exit gate**
+
+- [ ] `scripts/verify_phase3c.sh`
+
+**Exit condition:** URL, subtitle, and email ingestion work. `ingest_url`
+MCP tool callable. `pytest` green. `mypy --strict` passes.
 
 ---
 
 ## Phase 4 — Agentic Retrieval Loop
 
-**Entry condition:** Phase 3 exit condition met.
+**Entry condition:** Phase 3C exit condition met (or Phase 3A if Phase 3B/3C deferred).
 
 **Goal:** Transform AgentRAG from a passive RAG server into an active retrieval
 partner. Add three MCP tools that close the single-pass retrieval gap: query
@@ -241,6 +355,10 @@ class EvaluationReport:
 
 ---
 
+**Step 6 — Exit gate**
+
+- [ ] `scripts/verify_phase4.sh`
+
 **Exit condition:** `search_multi`, `evaluate_chunks`, and `plan_query` are
 callable from Claude Desktop. Full agentic loop test passes. Gemini graceful-degrade
 verified. `pytest` green. `mypy --strict` passes.
@@ -309,6 +427,10 @@ Deliverables follow strict TDD execution order.
 
 ---
 
+**Step 5 — Exit gate**
+
+- [ ] `scripts/verify_phase5.sh`
+
 **Exit condition:** Metadata filters pass integration tests with ≥3 fields. Re-ranker
 activates via `AGENTRAG_RERANK=true`. Concurrent upsert test passes. `pytest` green.
 `mypy --strict` passes.
@@ -348,8 +470,9 @@ running MCP server in under 60 seconds.
       - 60-second quickstart (install → set `AGENTRAG_GOOGLE_API_KEY` → `agentrag serve`)
       - Claude Desktop JSON config block (copy-paste ready)
       - Full table of all CLI flags and env vars
-      - All 10 MCP tools listed with one-line descriptions
-- [ ] `CHANGELOG.md` with `v0.1.0` entry summarising all 5 phases
+      - All MCP tools listed with one-line descriptions
+      - Supported file types table with optional dependency groups
+- [ ] `CHANGELOG.md` with `v0.1.0` entry summarising all phases
 
 ---
 
@@ -369,6 +492,105 @@ running MCP server in under 60 seconds.
 
 ---
 
+**Step 6 — Exit gate**
+
+- [ ] `scripts/verify_phase6.sh`
+
 **Exit condition:** `pip install agentrag && agentrag serve` works on a clean machine.
 `uvx agentrag serve` works. CI matrix green across Python 3.12 and 3.13.
 PyPI package published at `https://pypi.org/project/agentrag/`.
+
+---
+
+## Phase 7 — Multi-Collection & Streaming Retrieval
+
+**Entry condition:** Phase 6 exit condition met.
+
+**Goal:** Add workspace isolation via named Qdrant collections and async
+streaming retrieval. Users can maintain separate knowledge bases (e.g., one
+per project) and Claude receives results as they score rather than waiting for
+the full top-k set.
+
+**Dependency:** None. All capabilities use existing `qdrant-client` and stdlib `asyncio`.
+
+### Deliverables
+
+---
+
+**Step 1 — Multi-collection support**
+
+- [ ] `AGENTRAG_COLLECTION` env var (default: `documents`) — configures active collection
+- [ ] `tests/unit/test_store.py` — extend: two collections, same source_id, isolated data
+- [ ] `store/qdrant.py` — replace hardcoded `_COLLECTION` with `settings.collection`
+- [ ] New MCP tools:
+      - `list_collections() -> list[str]` — list all Qdrant collections
+      - `switch_collection(name: str) -> str` — set active collection for subsequent calls
+      - `create_collection(name: str) -> str` — create new named collection
+- [ ] Integration test: ingest into collection A, search in collection B → empty results.
+      Switch to A → results found.
+
+---
+
+**Step 2 — Streaming retrieval**
+
+- [ ] `src/agentrag/retrieval/streaming.py` — async generator yielding `SearchResult` as scored
+- [ ] `tests/unit/test_streaming.py` — async test consuming generator, verify order
+- [ ] New MCP tool: `search_stream(query: str, top_k: int) -> AsyncIterator[SearchResult]`
+      (depends on MCP SDK support for streaming — if not available, falls back to batch)
+- [ ] Integration test: streaming search returns same results as batch search
+
+---
+
+**Step 3 — Exit gate**
+
+- [ ] `scripts/verify_phase7.sh`
+
+**Exit condition:** Named collections work. Streaming search works or gracefully
+falls back. `pytest` green. `mypy --strict` passes.
+
+---
+
+## Phase 8 — Cloud Sync (Optional, User Opt-In)
+
+**Entry condition:** Phase 7 exit condition met.
+
+**Goal:** Optional cloud sync for the vector store. Users can back up and
+restore their Qdrant data to cloud storage. Privacy-preserving: encrypted
+at rest, user-controlled keys, explicit opt-in only.
+
+**Dependency:** Cloud storage library (S3, GDrive, or Azure Blob — chosen at
+phase start with user approval). User must provide credentials.
+
+### Deliverables
+
+---
+
+**Step 1 — Sync abstraction layer**
+
+- [ ] `src/agentrag/sync/base.py` — `SyncBackend` protocol: `push()`, `pull()`, `status()`
+- [ ] `src/agentrag/sync/local.py` — local directory backup (always available, no cloud)
+
+---
+
+**Step 2 — Cloud backend** _(library chosen at phase start)_
+
+- [ ] `src/agentrag/sync/cloud.py` — implements `SyncBackend` for chosen provider
+- [ ] Encryption at rest using user-provided key
+- [ ] New env vars: `AGENTRAG_SYNC_BACKEND`, `AGENTRAG_SYNC_ENDPOINT`, `AGENTRAG_SYNC_KEY`
+
+---
+
+**Step 3 — CLI commands**
+
+- [ ] `agentrag sync push` — upload current Qdrant snapshot
+- [ ] `agentrag sync pull` — restore from latest snapshot
+- [ ] `agentrag sync status` — show last sync time and diff
+
+---
+
+**Step 4 — Exit gate**
+
+- [ ] `scripts/verify_phase8.sh`
+
+**Exit condition:** Local backup works. Cloud sync works with chosen provider.
+No data syncs without explicit user action. `pytest` green. `mypy --strict` passes.
