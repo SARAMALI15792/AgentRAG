@@ -88,3 +88,31 @@ class DocumentContent:
     filename: str
     full_text: str
     metadata: dict[str, Any]
+
+
+@dataclass
+class QueryPlan:
+    """A decomposed query plan produced by the query planner."""
+
+    original_query: str
+    sub_queries: list[str]  # 1–4 focused sub-questions; always includes original
+
+
+@dataclass
+class ChunkScore:
+    """Relevance score for one chunk against a query."""
+
+    chunk_id: str
+    source_id: str
+    score: float  # 0.0 (irrelevant) → 1.0 (directly answers query)
+    reason: str  # one-sentence explanation
+
+
+@dataclass
+class EvaluationReport:
+    """Chunk relevance evaluation report produced by the evaluator."""
+
+    query: str
+    scored_chunks: list[ChunkScore]
+    sufficient: bool  # True if any chunk scores >= 0.7
+    suggested_queries: list[str]  # alternative queries when not sufficient
