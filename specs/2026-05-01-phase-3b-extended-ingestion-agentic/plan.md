@@ -4,9 +4,29 @@
 
 ---
 
+## Skills — Mandatory Invocations
+
+The following `.claude/skills` must be invoked at the indicated points during
+implementation. These are not optional — they encode project-specific patterns
+that override general knowledge.
+
+| Skill | Invoke Before | Purpose |
+|-------|---------------|---------|
+| `python-testing-patterns` | Every RED/GREEN step (all groups) | pytest fixtures, mocking patterns, AAA structure, async test setup, parameterized tests for multi-format readers |
+| `fastapi-python` | Groups C8–C9, F2–F3 | FastAPI lifespan patterns, async tool handlers, Pydantic request/response models, error handling with HTTPException |
+| `pydantic` | Group E2 (domain types), Group A (config changes) | Pydantic v2 dataclass patterns, `model_dump()`, Settings validation, type coercion rules |
+| `machine-learning` | Group E1 (embeddings context) | sentence-transformers embedding patterns, model loading, batch inference — relevant for understanding how query embeddings interact with agentic retrieval |
+
+**Rule:** If a task touches code that falls under a skill's domain, invoke
+the skill via the `Skill` tool before writing any implementation code for
+that task. This is in addition to Context7 lookups (Article I.4).
+
+---
+
 ## Group A — Infrastructure & Dependencies
 
 **Goal:** Reader plugin registry and all new dependencies installed.
+**Skills:** `python-testing-patterns` (A7–A10), `pydantic` (A1–A5 config changes)
 
 | # | Task | Files | TDD |
 |---|------|-------|-----|
@@ -28,6 +48,7 @@
 ## Group B — File Readers (Office, eBook, Structured)
 
 **Goal:** 9 new file types readable and registered.
+**Skills:** `python-testing-patterns` (B3, B6, B8 — parameterized tests per file type)
 
 | # | Task | Files | TDD |
 |---|------|-------|-----|
@@ -48,6 +69,7 @@
 ## Group C — Web, Subtitle, and Email Readers
 
 **Goal:** URL ingestion, subtitle parsing, email parsing — all registered.
+**Skills:** `python-testing-patterns` (C2, C4, C6), `fastapi-python` (C8–C9 — MCP tool handlers + app registration)
 
 | # | Task | Files | TDD |
 |---|------|-------|-----|
@@ -81,6 +103,7 @@
 ## Group E — Agentic Retrieval Types & Modules
 
 **Goal:** Query decomposition, multi-query search, chunk evaluation — all working with Gemini graceful degradation.
+**Skills:** `pydantic` (E2 — domain dataclasses), `machine-learning` (E1 — embedding context), `python-testing-patterns` (E3, E5 — mock Gemini client patterns)
 
 | # | Task | Files | TDD |
 |---|------|-------|-----|
@@ -98,6 +121,7 @@
 ## Group F — Agentic MCP Tools & Integration
 
 **Goal:** Three new MCP tools (`plan_query`, `search_multi`, `evaluate_chunks`) registered and integration-tested.
+**Skills:** `fastapi-python` (F2–F3 — async handlers, lifespan registration), `python-testing-patterns` (F1, F4–F5 — integration test patterns)
 
 | # | Task | Files | TDD |
 |---|------|-------|-----|

@@ -97,6 +97,32 @@ testable and keeps the dependency graph clean.
 ≤15 lines of business logic (Article IV.1). All real logic lives in
 `query_planner.py`, `evaluator.py`, and `searcher.py`.
 
+### D8 — Skill Invocations During Implementation
+
+Four `.claude/skills` are mandatory during Phase 3B coding. These provide
+project-relevant patterns that Context7 docs alone don't cover:
+
+- **`python-testing-patterns`** — Invoked before every RED/GREEN TDD step.
+  Provides: pytest parameterized fixtures for multi-format reader tests,
+  AAA structure enforcement, async mock patterns for Gemini client tests,
+  integration test isolation with `tmp_path` and real Qdrant.
+
+- **`fastapi-python`** — Invoked before writing MCP tool handlers and
+  `app.py` registration. Provides: FastAPI lifespan context manager patterns
+  (required by FastMCP per tech-stack.md), async `def` vs `def` selection
+  for handlers, Pydantic model validation for tool inputs, error handling
+  with early-return guard clauses.
+
+- **`pydantic`** — Invoked before modifying `config.py` (Settings changes)
+  and `types.py` (new domain dataclasses). Provides: Pydantic v2 patterns
+  (`model_dump()` not `dict()`), Settings from env vars, type coercion
+  rules, `Field` validation for constrained types.
+
+- **`machine-learning`** — Invoked before writing agentic retrieval code
+  that interacts with embeddings. Provides: sentence-transformers loading
+  patterns, batch inference, understanding of how query embeddings feed
+  into the agentic search loop.
+
 ---
 
 ## Open Risks

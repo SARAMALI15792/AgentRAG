@@ -9,6 +9,20 @@
 Each task group has an intermediate validation gate. The phase is complete
 only when all gates pass AND the final exit gate script exits 0.
 
+### Skill Invocation Verification
+
+At each gate, verify the following skills were invoked before the code
+they govern was written. A gate fails if a skill was skipped.
+
+| Gate | Required Skill Invocations |
+|------|---------------------------|
+| A | `python-testing-patterns` (registry tests), `pydantic` (config changes) |
+| B | `python-testing-patterns` (parameterized reader tests) |
+| C | `python-testing-patterns` (URL/subtitle/email tests), `fastapi-python` (tool handlers) |
+| D | `python-testing-patterns` (integration test patterns) |
+| E | `pydantic` (domain types), `machine-learning` (embedding context), `python-testing-patterns` (mock patterns) |
+| F | `fastapi-python` (tool registration), `python-testing-patterns` (integration tests) |
+
 ---
 
 ## Gate A — Infrastructure & Registry
