@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 def _epub_to_text(epub_path: Path | str) -> str:
     """Extract plain text from an EPUB file via ebooklib + BeautifulSoup."""
     try:
-        import ebooklib  # type: ignore[import-untyped]
+        import ebooklib
         from ebooklib import epub
     except ImportError:
         raise ImportError(
@@ -40,7 +40,7 @@ def read_epub(path: Path) -> str:
 def mobi_extract(path: str) -> tuple[str, str]:
     """Thin wrapper around mobi.extract so tests can patch it."""
     try:
-        from mobi import extract  # type: ignore[import-untyped]
+        from mobi import extract
     except ImportError:
         raise ImportError(
             "mobi is required for .mobi support. "

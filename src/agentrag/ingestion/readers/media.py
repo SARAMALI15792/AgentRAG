@@ -8,7 +8,7 @@ from pathlib import Path
 def read_srt(path: Path) -> str:
     """Extract timestamped text segments from an SRT subtitle file."""
     try:
-        import pysrt  # type: ignore[import-untyped]
+        import pysrt
     except ImportError:
         raise ImportError(
             "pysrt is required for .srt support. "
@@ -26,7 +26,7 @@ def read_srt(path: Path) -> str:
 def read_vtt(path: Path) -> str:
     """Extract cue text from a WebVTT subtitle file."""
     try:
-        import webvtt  # type: ignore[import-untyped]
+        import webvtt
     except ImportError:
         raise ImportError(
             "webvtt-py is required for .vtt support. "
