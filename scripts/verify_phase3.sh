@@ -7,6 +7,9 @@ set -euo pipefail
 
 echo "=== Phase 3 Exit Gate ==="
 
+echo "--- Formatting and linting ---"
+uv run black . && uv run ruff check .
+
 echo "--- Running full test suite ---"
 uv run pytest --tb=short
 

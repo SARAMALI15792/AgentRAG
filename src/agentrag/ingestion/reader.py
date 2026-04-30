@@ -73,15 +73,18 @@ def _read_html(path: Path) -> str:
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup.find_all(["nav", "header", "footer", "script", "style"]):
         tag.decompose()
-    return soup.get_text(separator="\n")
+    return soup.get_text(separator="\n", strip=True)
 
 
 def _read_ipynb(path: Path) -> str:
     """Extract source text from code and markdown cells; skip raw cells."""
+    # json.loads returns dict[str, Any]; notebook cell structure is heterogeneous
     nb: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     parts: list[str] = []
     for cell in nb.get("cells", []):
         if cell.get("cell_type") in {"code", "markdown"}:
             source = cell.get("source", [])
-            parts.append("".join(source))
+            # nbformat allows source as list[str] or plain str
+            text = source if isinstance(source, str) else "".join(source)
+            parts.append(text)
     return "\n\n".join(parts)
