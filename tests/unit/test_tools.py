@@ -105,11 +105,15 @@ def test_ingest_directory_delegates_to_pipeline_per_file(
         with patch("agentrag.server.tools.Path") as mock_path_class:
             mock_dir = MagicMock()
             mock_dir.is_dir.return_value = True
-            # rglob called 3 times (once per extension), return 1 file per call
+            # rglob called once per extension (7 total); 3 return files, 4 empty
             mock_dir.rglob.side_effect = [
                 [Path("/tmp/a.txt")],
-                [Path("/tmp/b.pdf")],
-                [Path("/tmp/c.md")],
+                [Path("/tmp/b.md")],
+                [Path("/tmp/c.pdf")],
+                [],
+                [],
+                [],
+                [],
             ]
             mock_path_class.return_value = mock_dir
 
@@ -209,3 +213,18 @@ def test_delete_source_unknown_returns_not_found(mock_store: MagicMock) -> None:
 
     assert result.status == "not_found"
     assert result.chunks_deleted == 0
+
+
+def test_ingest_directory_all_seven_types(
+    mock_pipeline: MagicMock, tmp_path: Path
+) -> None:
+    """ingest_directory processes all 7 supported extensions, one file each."""
+    for ext in ["txt", "md", "pdf", "docx", "html", "py", "ipynb"]:
+        (tmp_path / f"sample.{ext}").write_bytes(b"placeholder")
+
+    with patch("agentrag.server.tools.ingest", mock_pipeline):
+        results = ingest_directory(directory_path=str(tmp_path))
+
+    assert len(results) == 7
+    assert mock_pipeline.call_count == 7
+    assert all(r.status == "ok" for r in results)

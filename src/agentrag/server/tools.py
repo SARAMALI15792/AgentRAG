@@ -34,8 +34,7 @@ def ingest_directory(directory_path: str) -> list[IngestResult]:
         return []
 
     results: list[IngestResult] = []
-    # Phase 2: only .txt, .md, .pdf (Phase 1 file types)
-    for ext in ["*.txt", "*.md", "*.pdf"]:
+    for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
         for file_path in dir_path.rglob(ext):
             result = ingest(file_path, settings)
             results.append(result)
