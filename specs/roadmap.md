@@ -37,7 +37,7 @@ Phases are not time-boxed — they are scope-boxed.
 
 **Shipped:**
 - `retrieval/searcher.py` — embeds query, delegates to QdrantStore
-- `retrieval/reranker.py` — identity stub (Phase 5 implementation)
+- `retrieval/reranker.py` — identity stub (Phase 4 implementation)
 - `server/tools.py` — 7 MCP tool handlers (all ≤15 lines per Article IV.1)
 - `server/app.py` — FastAPI + FastMCP with lifespan hook, stdio + HTTP transports
 - `cli.py` — `agentrag serve` command with --transport flag
@@ -67,13 +67,21 @@ Phases are not time-boxed — they are scope-boxed.
 
 ---
 
-## Phase 3B — Office, eBook, and Structured Data Support
+## Phase 3B — Extended Ingestion & Agentic Retrieval
 
 **Entry condition:** Phase 3A exit condition met.
 
-**Goal:** Support `.xlsx`, `.pptx`, `.csv`, `.epub`, `.mobi`, `.json`,
-`.yaml`, `.xml`, `.toml` ingestion. All new readers register through the
-reader plugin registry (Article IV.6). No new external services.
+**Goal:** Extend AgentRAG to support all planned file types (office, eBook,
+structured data, web, subtitle, email), add URL ingestion, and transform
+retrieval from single-pass search into an agentic loop with query
+decomposition, multi-query search, and relevance evaluation. After this
+phase, AgentRAG ingests 20+ file types and Claude can autonomously plan,
+search, evaluate, and re-search — all through native MCP tool calls.
+
+**Dependencies:**
+- Optional libraries per format group (office, ebooks, web)
+- `AGENTRAG_GOOGLE_API_KEY` env var for agentic retrieval (free Google AI
+  Studio key). Graceful degradation if key missing or API unreachable.
 
 ### Deliverables
 
@@ -88,16 +96,20 @@ confirmed failing before each implementation file is created.
 - `python-pptx` — `Presentation`, slide iteration, text frame extraction
 - `ebooklib` — `epub.read_epub`, item iteration, XHTML content
 - `PyYAML` — `safe_load`, `dump`
+- `google-genai` Python SDK — `Client`, `generate_content`, structured JSON output, error handling
 
 ---
 
-**Step 1 — Dependencies**
+**Step 1 — Dependencies (file readers)**
 
 - [ ] Add `openpyxl 3.1.x` to `pyproject.toml` under `[project.optional-dependencies] office`
 - [ ] Add `python-pptx 1.0.x` to `pyproject.toml` under `[project.optional-dependencies] office`
 - [ ] Add `ebooklib 0.18.x` to `pyproject.toml` under `[project.optional-dependencies] ebooks`
 - [ ] Add `mobi 0.3.x` to `pyproject.toml` under `[project.optional-dependencies] ebooks`
 - [ ] Add `PyYAML 6.x` to `pyproject.toml` runtime deps
+- [ ] Add `pysrt 1.1.x` to `pyproject.toml` optional `web` group
+- [ ] Add `webvtt-py 0.5.x` to `pyproject.toml` optional `web` group
+- [ ] Move `httpx` to both dev and optional `web` runtime dep
 - [ ] Run `uv lock` — commit updated `uv.lock`
 
 ---
@@ -144,54 +156,7 @@ confirmed failing before each implementation file is created.
 
 ---
 
-**Step 6 — Extend `ingest_directory`**
-
-- [ ] `tests/unit/test_tools.py` — add test: `ingest_directory` with all extension types
-- [ ] `src/agentrag/server/tools.py` — extend glob list with all new extensions
-- [ ] Run `uv run pytest tests/unit/test_tools.py` → green
-
----
-
-**Step 7 — Integration test**
-
-- [ ] `tests/integration/test_extended_ingestion_3b.py` — real Qdrant, real files:
-      - Ingest one fixture file per new type → `chunk_count > 0`
-      - `ingest_directory` on mixed directory → all types ingested
-      - Add fixture files to `tests/fixtures/`
-
----
-
-**Step 8 — Exit gate**
-
-- [ ] `scripts/verify_phase3b.sh` — pytest + mypy + all new file types ingest successfully
-
-**Exit condition:** All 16 file types ingest without error. Reader plugin
-registry works. `pytest` green. `mypy --strict` passes.
-
----
-
-## Phase 3C — Web & Media Ingestion
-
-**Entry condition:** Phase 3B exit condition met.
-
-**Goal:** Support URL ingestion (web pages), subtitle files (`.srt`, `.vtt`),
-and email files (`.eml`, `.mbox`). URL ingestion promotes `httpx` from dev
-to optional runtime dependency.
-
-### Deliverables
-
----
-
-**Step 1 — Dependencies**
-
-- [ ] Add `pysrt 1.1.x` to `pyproject.toml` optional `web` group
-- [ ] Add `webvtt-py 0.5.x` to `pyproject.toml` optional `web` group
-- [ ] Move `httpx` to both dev and optional `web` runtime dep
-- [ ] Run `uv lock`
-
----
-
-**Step 2 — URL reader**
+**Step 6 — URL reader** _(TDD)_
 
 - [ ] `tests/unit/test_url_reader.py` — mock HTTP responses, confirm red then green
 - [ ] `src/agentrag/ingestion/readers/web.py`:
@@ -201,68 +166,47 @@ to optional runtime dependency.
 
 ---
 
-**Step 3 — Subtitle readers**
+**Step 7 — Subtitle readers** _(TDD per file type)_
 
 - [ ] `tests/unit/test_reader.py` — extend with `.srt`, `.vtt` test cases
 - [ ] `src/agentrag/ingestion/readers/media.py`:
       - `.srt` via `pysrt`: extract timestamped text segments
       - `.vtt` via `webvtt-py`: extract cue text
+- [ ] Register in reader registry
 
 ---
 
-**Step 4 — Email readers**
+**Step 8 — Email readers** _(TDD per file type)_
 
 - [ ] `tests/unit/test_reader.py` — extend with `.eml`, `.mbox` test cases
 - [ ] `src/agentrag/ingestion/readers/email.py`:
       - `.eml` via stdlib `email`: parse headers + body text
       - `.mbox` via stdlib `mailbox`: iterate messages → text
+- [ ] Register in reader registry
 
 ---
 
-**Step 5 — New MCP tool: `ingest_url`**
+**Step 9 — Extend `ingest_directory` + new `ingest_url` tool**
 
+- [ ] `tests/unit/test_tools.py` — add test: `ingest_directory` with all extension types
+- [ ] `src/agentrag/server/tools.py` — extend glob list with all new extensions
 - [ ] `tests/unit/test_tools.py` — add `ingest_url` test
 - [ ] Add `ingest_url(url: str, metadata: dict) -> IngestResult` tool handler
-- [ ] Register in `app.py`
+- [ ] Register `ingest_url` in `app.py`
+- [ ] Run `uv run pytest tests/unit/test_tools.py` → green
 
 ---
 
-**Step 6 — Exit gate**
+**Step 10 — Integration test (file ingestion)**
 
-- [ ] `scripts/verify_phase3c.sh`
-
-**Exit condition:** URL, subtitle, and email ingestion work. `ingest_url`
-MCP tool callable. `pytest` green. `mypy --strict` passes.
-
----
-
-## Phase 4 — Agentic Retrieval Loop
-
-**Entry condition:** Phase 3C exit condition met (or Phase 3A if Phase 3B/3C deferred).
-
-**Goal:** Transform AgentRAG from a passive RAG server into an active retrieval
-partner. Add three MCP tools that close the single-pass retrieval gap: query
-decomposition, relevance evaluation, and multi-query search. After this phase,
-Claude can decompose a complex question into sub-queries, search each
-independently, evaluate whether the results actually answer the question, and
-decide whether to re-search — all through tool calls, without special prompting.
-
-**Dependency:** Requires `AGENTRAG_GOOGLE_API_KEY` env var (free Google AI Studio key). Graceful degradation if key missing or API unreachable.
-
-### Deliverables
-
-Deliverables follow strict TDD execution order. Test file written and
-confirmed failing before each implementation file is created.
+- [ ] `tests/integration/test_extended_ingestion_3b.py` — real Qdrant, real files:
+      - Ingest one fixture file per new type → `chunk_count > 0`
+      - `ingest_directory` on mixed directory → all types ingested
+      - Add fixture files to `tests/fixtures/`
 
 ---
 
-**Step 0 — Context7 lookup** _(before any code)_
-
-- `google-genai` Python SDK — `Client`, `generate_content`, structured JSON output, error handling
-
----
-
-**Step 1 — New domain types** _(no tests — pure dataclasses)_
+**Step 11 — New domain types for agentic retrieval** _(no tests — pure dataclasses)_
 
 Add to `src/agentrag/types.py`:
 
@@ -283,18 +227,18 @@ class ChunkScore:
 class EvaluationReport:
     query: str
     scored_chunks: list[ChunkScore]
-    sufficient: bool         # True if at least one chunk scores ≥ 0.7
+    sufficient: bool         # True if at least one chunk scores >= 0.7
     suggested_queries: list[str]  # alternative queries if not sufficient
 ```
 
 ---
 
-**Step 2 — Query planner**
+**Step 12 — Query planner**
 
 - [ ] `tests/unit/test_query_planner.py` ← write first, confirm red
       (Gemini client is mocked — no live API calls in unit tests)
       - simple query → `QueryPlan` with `sub_queries = [original_query]`
-      - compound query ("compare X and Y") → `sub_queries` has ≥ 2 items
+      - compound query ("compare X and Y") → `sub_queries` has >= 2 items
       - API key missing or Gemini unavailable → degrades gracefully, returns single-item plan
       - `original_query` always preserved in output
 - [ ] `src/agentrag/retrieval/query_planner.py` ← implement to make tests green
@@ -305,11 +249,11 @@ class EvaluationReport:
 
 ---
 
-**Step 3 — Chunk evaluator**
+**Step 13 — Chunk evaluator**
 
 - [ ] `tests/unit/test_evaluator.py` ← write first, confirm red
       (Gemini client mocked — no live API calls in unit tests)
-      - all chunks score ≥ 0.7 → `sufficient = True`
+      - all chunks score >= 0.7 → `sufficient = True`
       - all chunks score < 0.7 → `sufficient = False`, `suggested_queries` non-empty
       - empty chunk list → `sufficient = False`
       - each `ChunkScore.score` is in `[0.0, 1.0]`
@@ -320,7 +264,7 @@ class EvaluationReport:
 
 ---
 
-**Step 4 — New MCP tool handlers**
+**Step 14 — Agentic MCP tool handlers**
 
 - [ ] `tests/unit/test_agentic_tools.py` ← write first, confirm red
       (query_planner, evaluator, searcher all mocked)
@@ -328,7 +272,7 @@ class EvaluationReport:
       - `search_multi`: empty `queries` list raises `ValueError`
       - `evaluate_chunks`: delegates to evaluator, returns `EvaluationReport`
       - `plan_query`: delegates to query_planner, returns `QueryPlan`
-      - all handlers ≤ 15 lines of meaningful code (Article IV.1)
+      - all handlers <= 15 lines of meaningful code (Article IV.1)
 - [ ] Add to `src/agentrag/server/tools.py`:
       - `search_multi(queries: list[str], top_k: int) -> list[SearchResult]`
         Calls `searcher.search` for each query, deduplicates by `chunk_id`
@@ -342,11 +286,11 @@ class EvaluationReport:
 
 ---
 
-**Step 5 — Integration**
+**Step 15 — Integration test (agentic retrieval)**
 
 - [ ] `tests/integration/test_agentic_retrieval.py` — real Qdrant, Gemini optional:
       - ingest `sample.txt`, call `plan_query` → verify sub-queries are strings
-      - call `search_multi` with 2 queries → result count ≤ `top_k`, no duplicates
+      - call `search_multi` with 2 queries → result count <= `top_k`, no duplicates
       - call `evaluate_chunks` on results → `EvaluationReport` returned without error
       - full loop: `plan_query` → `search_multi` → `evaluate_chunks` → if not
         sufficient → `search_multi` with `suggested_queries` → verify second pass
@@ -355,19 +299,21 @@ class EvaluationReport:
 
 ---
 
-**Step 6 — Exit gate**
+**Step 16 — Exit gate**
 
-- [ ] `scripts/verify_phase4.sh`
+- [ ] `scripts/verify_phase3b.sh`
 
-**Exit condition:** `search_multi`, `evaluate_chunks`, and `plan_query` are
-callable from Claude Desktop. Full agentic loop test passes. Gemini graceful-degrade
-verified. `pytest` green. `mypy --strict` passes.
+**Exit condition:** All 20+ file types ingest without error. Reader plugin
+registry works. `ingest_url` MCP tool callable. `search_multi`,
+`evaluate_chunks`, and `plan_query` callable from Claude Desktop. Full agentic
+loop test passes. Gemini graceful-degrade verified. URL, subtitle, and email
+ingestion work. `pytest` green. `mypy --strict` passes.
 
 ---
 
-## Phase 5 — Search Quality
+## Phase 4 — Search Quality
 
-**Entry condition:** Phase 4 exit condition met.
+**Entry condition:** Phase 3B exit condition met.
 
 **Goal:** Improve retrieval precision. Activate the cross-encoder re-ranker stub
 (already stubbed in Phase 2 `reranker.py`), harden metadata filtering, and verify
@@ -414,7 +360,7 @@ Deliverables follow strict TDD execution order.
 **Step 3 — Concurrent upsert safety**
 
 - [ ] `tests/integration/test_concurrent_upsert.py`:
-      - Re-ingest `sample.txt` 3× concurrently via `threading.Thread`
+      - Re-ingest `sample.txt` 3x concurrently via `threading.Thread`
       - After all threads complete: `list_sources()` returns exactly 1 entry for that source
       - `chunk_count` is stable (same value on every run)
 
@@ -429,17 +375,17 @@ Deliverables follow strict TDD execution order.
 
 **Step 5 — Exit gate**
 
-- [ ] `scripts/verify_phase5.sh`
+- [ ] `scripts/verify_phase4.sh`
 
-**Exit condition:** Metadata filters pass integration tests with ≥3 fields. Re-ranker
+**Exit condition:** Metadata filters pass integration tests with >=3 fields. Re-ranker
 activates via `AGENTRAG_RERANK=true`. Concurrent upsert test passes. `pytest` green.
 `mypy --strict` passes.
 
 ---
 
-## Phase 6 — Distribution
+## Phase 5 — Distribution
 
-**Entry condition:** Phase 5 exit condition met.
+**Entry condition:** Phase 4 exit condition met.
 
 **Goal:** AgentRAG is installable from PyPI. A new user can go from zero to a
 running MCP server in under 60 seconds.
@@ -494,7 +440,7 @@ running MCP server in under 60 seconds.
 
 **Step 6 — Exit gate**
 
-- [ ] `scripts/verify_phase6.sh`
+- [ ] `scripts/verify_phase5.sh`
 
 **Exit condition:** `pip install agentrag && agentrag serve` works on a clean machine.
 `uvx agentrag serve` works. CI matrix green across Python 3.12 and 3.13.
@@ -502,9 +448,9 @@ PyPI package published at `https://pypi.org/project/agentrag/`.
 
 ---
 
-## Phase 7 — Multi-Collection & Streaming Retrieval
+## Phase 6 — Multi-Collection & Streaming Retrieval
 
-**Entry condition:** Phase 6 exit condition met.
+**Entry condition:** Phase 5 exit condition met.
 
 **Goal:** Add workspace isolation via named Qdrant collections and async
 streaming retrieval. Users can maintain separate knowledge bases (e.g., one
@@ -543,16 +489,16 @@ the full top-k set.
 
 **Step 3 — Exit gate**
 
-- [ ] `scripts/verify_phase7.sh`
+- [ ] `scripts/verify_phase6.sh`
 
 **Exit condition:** Named collections work. Streaming search works or gracefully
 falls back. `pytest` green. `mypy --strict` passes.
 
 ---
 
-## Phase 8 — Cloud Sync (Optional, User Opt-In)
+## Phase 7 — Cloud Sync (Optional, User Opt-In)
 
-**Entry condition:** Phase 7 exit condition met.
+**Entry condition:** Phase 6 exit condition met.
 
 **Goal:** Optional cloud sync for the vector store. Users can back up and
 restore their Qdrant data to cloud storage. Privacy-preserving: encrypted
@@ -590,7 +536,7 @@ phase start with user approval). User must provide credentials.
 
 **Step 4 — Exit gate**
 
-- [ ] `scripts/verify_phase8.sh`
+- [ ] `scripts/verify_phase7.sh`
 
 **Exit condition:** Local backup works. Cloud sync works with chosen provider.
 No data syncs without explicit user action. `pytest` green. `mypy --strict` passes.
