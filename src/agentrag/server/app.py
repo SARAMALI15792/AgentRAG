@@ -136,6 +136,18 @@ def create_app() -> tuple[FastAPI, FastMCP]:
             "status": result.status,
         }
 
+    @mcp.tool()
+    def ingest_url(url: str) -> dict[str, Any]:
+        """Fetch a web page and ingest its text content."""
+        result = tools.ingest_url(url)
+        return {
+            "source_id": result.source_id,
+            "filename": result.filename,
+            "chunk_count": result.chunk_count,
+            "status": result.status,
+            "error": result.error,
+        }
+
     # Create FastAPI app and mount MCP SSE transport
     app = FastAPI(title="AgentRAG MCP Server")
 

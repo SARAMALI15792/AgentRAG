@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_registry(monkeypatch: Any) -> None:
+    """Each test gets a fresh empty registry without mutating global state."""
+    monkeypatch.setattr(
+        "agentrag.ingestion.reader_registry._registry",
+        {},
+    )
+    monkeypatch.setattr(
+        "agentrag.ingestion.reader_registry._loaded_modules",
+        set(),
+    )
 
 
 def test_register_and_lookup() -> None:
     """Registered reader is returned by get_reader for its extension."""
     from agentrag.ingestion import reader_registry
-
-    reader_registry._registry.clear()
 
     def _fake_reader(path: Path) -> str:
         return "fake"
@@ -23,8 +35,6 @@ def test_register_and_lookup() -> None:
 def test_register_multiple_extensions() -> None:
     """One reader can be registered for multiple extensions."""
     from agentrag.ingestion import reader_registry
-
-    reader_registry._registry.clear()
 
     def _multi(path: Path) -> str:
         return "multi"
@@ -39,8 +49,6 @@ def test_get_reader_unknown_extension_raises() -> None:
     """get_reader raises ValueError with actionable message for unknown extension."""
     from agentrag.ingestion import reader_registry
 
-    reader_registry._registry.clear()
-
     with pytest.raises(ValueError, match="Unsupported file type: .xyz"):
         reader_registry.get_reader(".xyz")
 
@@ -48,8 +56,6 @@ def test_get_reader_unknown_extension_raises() -> None:
 def test_supported_extensions_returns_set() -> None:
     """supported_extensions returns all registered extensions as a set."""
     from agentrag.ingestion import reader_registry
-
-    reader_registry._registry.clear()
 
     def _r(path: Path) -> str:
         return ""
@@ -65,8 +71,6 @@ def test_extension_normalized_to_lowercase() -> None:
     """Extensions are stored and looked up case-insensitively."""
     from agentrag.ingestion import reader_registry
 
-    reader_registry._registry.clear()
-
     def _r(path: Path) -> str:
         return ""
 
@@ -78,8 +82,6 @@ def test_extension_normalized_to_lowercase() -> None:
 def test_later_registration_overwrites() -> None:
     """Re-registering an extension replaces the previous reader."""
     from agentrag.ingestion import reader_registry
-
-    reader_registry._registry.clear()
 
     def _first(path: Path) -> str:
         return "first"

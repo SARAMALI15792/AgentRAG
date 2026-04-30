@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from agentrag.config import Settings
+from agentrag.ingestion import reader_registry
 from agentrag.ingestion.pipeline import ingest
+from agentrag.ingestion.pipeline import ingest_url as _ingest_url
 from agentrag.retrieval.searcher import search
 from agentrag.store.qdrant import QdrantStore
 from agentrag.types import (
@@ -34,12 +36,18 @@ def ingest_directory(directory_path: str) -> list[IngestResult]:
         return []
 
     results: list[IngestResult] = []
-    for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
-        for file_path in dir_path.rglob(ext):
+    for ext in reader_registry.supported_extensions():
+        for file_path in dir_path.rglob(f"*{ext}"):
             result = ingest(file_path, settings)
             results.append(result)
 
     return results
+
+
+def ingest_url(url: str, metadata: dict[str, str] | None = None) -> IngestResult:
+    """Fetch a web page and ingest its text content."""
+    settings = Settings()
+    return _ingest_url(url, settings, metadata)
 
 
 def search_documents(
