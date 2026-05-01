@@ -36,7 +36,10 @@ def read_eml(path: Path) -> str:
     """Parse an .eml file and extract headers + body text."""
     with open(path, encoding="utf-8", errors="replace") as f:
         msg = email.message_from_file(f)
-    return _extract_message_text(msg)
+    text = _extract_message_text(msg)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_mbox(path: Path) -> str:
@@ -47,7 +50,10 @@ def read_mbox(path: Path) -> str:
         text = _extract_message_text(message)
         if text.strip():
             parts.append(text)
-    return "\n\n---\n\n".join(parts)
+    text = "\n\n---\n\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 # Register email readers

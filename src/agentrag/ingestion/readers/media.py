@@ -20,7 +20,10 @@ def read_srt(path: Path) -> str:
     for sub in subs:
         timestamp = f"[{sub.start} --> {sub.end}]"
         parts.append(f"{timestamp} {sub.text}")
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_vtt(path: Path) -> str:
@@ -36,7 +39,10 @@ def read_vtt(path: Path) -> str:
     parts: list[str] = []
     for caption in webvtt.read(str(path)):
         parts.append(f"[{caption.start} --> {caption.end}] {caption.text}")
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 # Register subtitle readers

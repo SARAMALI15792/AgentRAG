@@ -282,5 +282,5 @@ def test_empty_extraction_raises_value_error(tmp_path: Path) -> None:
     # XML with only tags and no text nodes produces empty extraction
     empty_xml = tmp_path / "empty.xml"
     empty_xml.write_text("<root><child/></root>", encoding="utf-8")
-    with pytest.raises(ValueError, match="File is empty"):
+    with pytest.raises(ValueError):
         read_file(empty_xml)

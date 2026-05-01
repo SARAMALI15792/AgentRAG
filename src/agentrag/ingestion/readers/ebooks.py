@@ -29,7 +29,10 @@ def _epub_to_text(epub_path: Path | str) -> str:
         text = soup.get_text(separator="\n", strip=True)
         if text:
             parts.append(text)
-    return "\n\n".join(parts)
+    text = "\n\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {epub_path}.")
+    return text
 
 
 def read_epub(path: Path) -> str:
@@ -51,8 +54,13 @@ def mobi_extract(path: str) -> tuple[str, str]:
 
 def read_mobi(path: Path) -> str:
     """Extract text from a MOBI file by converting to EPUB first."""
-    _tempdir, epub_path = mobi_extract(str(path))
-    return _epub_to_text(epub_path)
+    import shutil
+
+    tempdir, epub_path = mobi_extract(str(path))
+    try:
+        return _epub_to_text(epub_path)
+    finally:
+        shutil.rmtree(tempdir, ignore_errors=True)
 
 
 # Register ebook readers

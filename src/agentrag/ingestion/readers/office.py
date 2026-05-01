@@ -29,7 +29,10 @@ def read_xlsx(path: Path) -> str:
             if line:
                 parts.append(line)
     wb.close()
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_pptx(path: Path) -> str:
@@ -55,7 +58,10 @@ def read_pptx(path: Path) -> str:
             notes_text = slide.notes_slide.notes_text_frame.text.strip()
             if notes_text:
                 parts.append(f"Speaker notes: {notes_text}")
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_csv(path: Path) -> str:
@@ -67,7 +73,10 @@ def read_csv(path: Path) -> str:
             line = ", ".join(row).strip()
             if line:
                 lines.append(line)
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 # Register all office readers

@@ -12,7 +12,13 @@ except ImportError:
         "Install it with: pip install agentrag[web]"
     ) from None
 
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    raise ImportError(
+        "beautifulsoup4 is required for URL ingestion. "
+        "Install it with: pip install agentrag[web]"
+    ) from None
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +37,9 @@ def read_url(url: str) -> str:
             response = client.get(url)
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        status = exc.response.status_code if hasattr(exc, "response") else exc
-        raise ConnectionError(f"HTTP error fetching {url}: {status}") from exc
+        raise ConnectionError(
+            f"HTTP error fetching {url}: {exc.response.status_code}"
+        ) from exc
     except httpx.TimeoutException as exc:
         raise ConnectionError(
             f"Request timed out fetching {url}. "

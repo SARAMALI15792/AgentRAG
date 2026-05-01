@@ -74,36 +74,38 @@ def evaluate(
             model=settings.gemini_model,
             contents=_PROMPT.format(query=query, chunks=chunks_text),
         )
-        raw: list[dict[str, Any]] = json.loads(response.text or "")
+        raw: Any = json.loads(response.text or "[]")
+        if not isinstance(raw, list):
+            return _degrade_report(query, results)
+
+        result_map = {r.chunk_id: r for r in results}
+        scored: list[ChunkScore] = []
+        suggested: list[str] = []
+
+        for item in raw:
+            chunk_id = str(item.get("chunk_id", ""))
+            raw_score = float(item.get("score", _DEGRADE_SCORE))
+            score = max(0.0, min(1.0, raw_score))
+            reason = str(item.get("reason", ""))
+            src = result_map.get(chunk_id)
+            scored.append(
+                ChunkScore(
+                    chunk_id=chunk_id,
+                    source_id=src.source_id if src else "",
+                    score=score,
+                    reason=reason,
+                )
+            )
+            if score < 0.7 and item.get("suggested_query"):
+                suggested.append(str(item["suggested_query"]))
+
+        sufficient = any(cs.score >= 0.7 for cs in scored)
+        return EvaluationReport(
+            query=query,
+            scored_chunks=scored,
+            sufficient=sufficient,
+            suggested_queries=suggested,
+        )
     except Exception:
         logger.warning("Evaluator degraded for query: %r", query, exc_info=True)
         return _degrade_report(query, results)
-
-    result_map = {r.chunk_id: r for r in results}
-    scored: list[ChunkScore] = []
-    suggested: list[str] = []
-
-    for item in raw:
-        chunk_id = str(item.get("chunk_id", ""))
-        raw_score = float(item.get("score", _DEGRADE_SCORE))
-        score = max(0.0, min(1.0, raw_score))
-        reason = str(item.get("reason", ""))
-        src = result_map.get(chunk_id)
-        scored.append(
-            ChunkScore(
-                chunk_id=chunk_id,
-                source_id=src.source_id if src else "",
-                score=score,
-                reason=reason,
-            )
-        )
-        if score < 0.7 and item.get("suggested_query"):
-            suggested.append(str(item["suggested_query"]))
-
-    sufficient = any(cs.score >= 0.7 for cs in scored)
-    return EvaluationReport(
-        query=query,
-        scored_chunks=scored,
-        sufficient=sufficient,
-        suggested_queries=suggested,
-    )

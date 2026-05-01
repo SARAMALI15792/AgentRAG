@@ -12,7 +12,10 @@ from typing import Any
 def read_json(path: Path) -> str:
     """Pretty-print JSON as plain text for semantic indexing."""
     data: Any = json.loads(path.read_text(encoding="utf-8"))
-    return json.dumps(data, indent=2, ensure_ascii=False)
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_yaml(path: Path) -> str:
@@ -20,7 +23,10 @@ def read_yaml(path: Path) -> str:
     import yaml
 
     data: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return yaml.safe_dump(data, default_flow_style=False, allow_unicode=True)
+    text: str = yaml.safe_dump(data, default_flow_style=False, allow_unicode=True)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_xml(path: Path) -> str:
@@ -33,13 +39,19 @@ def read_xml(path: Path) -> str:
             parts.append(elem.text.strip())
         if elem.tail and elem.tail.strip():
             parts.append(elem.tail.strip())
-    return "\n".join(parts)
+    text = "\n".join(parts)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 def read_toml(path: Path) -> str:
     """Load TOML and dump as JSON-style text for semantic indexing."""
     data: Any = tomllib.loads(path.read_text(encoding="utf-8"))
-    return json.dumps(data, indent=2, ensure_ascii=False)
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    if not text.strip():
+        raise ValueError(f"No text content extracted from {path}.")
+    return text
 
 
 # Register structured data readers

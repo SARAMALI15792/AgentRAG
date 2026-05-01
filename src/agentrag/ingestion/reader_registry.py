@@ -48,8 +48,10 @@ def get_reader(extension: str) -> ReaderFn:
     # Lazy-import the module if we know about it
     module_path = _LAZY_MODULES.get(ext)
     if module_path and module_path not in _loaded_modules:
-        _loaded_modules.add(module_path)
-        importlib.import_module(module_path)
+        importlib.import_module(
+            module_path
+        )  # raises ImportError with actionable message
+        _loaded_modules.add(module_path)  # only added after successful import
         reader = _registry.get(ext)
         if reader is not None:
             return reader
