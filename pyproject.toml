@@ -77,6 +77,9 @@ extend-exclude = [".agents", ".claude"]
 select = ["E", "W", "F", "I", "B", "C90", "UP", "N"]
 ignore = ["N818"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/agentrag/server/app.py" = ["C901"]
+
 [tool.mypy]
 strict = true
 
