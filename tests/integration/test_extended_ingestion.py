@@ -75,10 +75,10 @@ def test_ingest_ipynb(settings: Settings) -> None:
 
 
 def test_ingest_directory_mixed(settings: Settings) -> None:
-    """ingest_directory on fixtures/ returns 7 ok results, one per supported type."""
+    """ingest_directory on fixtures/ ingests all supported fixture files."""
     with patch("agentrag.server.tools.Settings", return_value=settings):
         results = ingest_directory(directory_path="tests/fixtures")
 
-    assert len(results) == 7
+    assert len(results) >= 7  # at minimum the original 7 Phase 3A types
     assert all(r.status == "ok" for r in results)
     assert all(r.chunk_count > 0 for r in results)

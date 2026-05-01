@@ -6,13 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from agentrag.config import Settings
+from agentrag.ingestion import reader_registry
 from agentrag.ingestion.pipeline import ingest
+from agentrag.ingestion.pipeline import ingest_url as _ingest_url
+from agentrag.retrieval import evaluator, query_planner
 from agentrag.retrieval.searcher import search
 from agentrag.store.qdrant import QdrantStore
 from agentrag.types import (
     DeleteResult,
     DocumentContent,
+    EvaluationReport,
     IngestResult,
+    QueryPlan,
     SearchResult,
     SourceInfo,
 )
@@ -34,12 +39,44 @@ def ingest_directory(directory_path: str) -> list[IngestResult]:
         return []
 
     results: list[IngestResult] = []
-    for ext in ["*.txt", "*.md", "*.pdf", "*.docx", "*.html", "*.py", "*.ipynb"]:
-        for file_path in dir_path.rglob(ext):
+    for ext in reader_registry.supported_extensions():
+        for file_path in dir_path.rglob(f"*{ext}"):
             result = ingest(file_path, settings)
             results.append(result)
 
     return results
+
+
+def plan_query(query: str) -> QueryPlan:
+    """Decompose a query into focused sub-queries via Gemini."""
+    settings = Settings()
+    return query_planner.plan(query, settings)
+
+
+def search_multi(queries: list[str], top_k: int = 5) -> list[SearchResult]:
+    """Search with multiple queries and deduplicate results by chunk_id."""
+    if not queries:
+        raise ValueError("queries list must not be empty")
+    settings = Settings()
+    seen: dict[str, SearchResult] = {}
+    for q in queries:
+        for result in search(q, top_k, settings):
+            existing = seen.get(result.chunk_id)
+            if existing is None or result.score > existing.score:
+                seen[result.chunk_id] = result
+    return sorted(seen.values(), key=lambda r: r.score, reverse=True)
+
+
+def evaluate_chunks(query: str, results: list[SearchResult]) -> EvaluationReport:
+    """Score each chunk's relevance to the query."""
+    settings = Settings()
+    return evaluator.evaluate(query, results, settings)
+
+
+def ingest_url(url: str, metadata: dict[str, str] | None = None) -> IngestResult:
+    """Fetch a web page and ingest its text content."""
+    settings = Settings()
+    return _ingest_url(url, settings, metadata)
 
 
 def search_documents(

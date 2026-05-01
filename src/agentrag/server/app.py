@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 from agentrag.config import Settings
 from agentrag.server import tools
 from agentrag.store.qdrant import QdrantStore
+from agentrag.types import SearchResult
 
 
 @dataclass
@@ -134,6 +135,73 @@ def create_app() -> tuple[FastAPI, FastMCP]:
             "source_id": result.source_id,
             "chunks_deleted": result.chunks_deleted,
             "status": result.status,
+        }
+
+    @mcp.tool()
+    def ingest_url(url: str) -> dict[str, Any]:
+        """Fetch a web page and ingest its text content."""
+        result = tools.ingest_url(url)
+        return {
+            "source_id": result.source_id,
+            "filename": result.filename,
+            "chunk_count": result.chunk_count,
+            "status": result.status,
+            "error": result.error,
+        }
+
+    @mcp.tool()
+    def plan_query(query: str) -> dict[str, Any]:
+        """Decompose a complex query into focused sub-queries."""
+        result = tools.plan_query(query)
+        return {
+            "original_query": result.original_query,
+            "sub_queries": result.sub_queries,
+        }
+
+    @mcp.tool()
+    def search_multi(queries: list[str], top_k: int = 5) -> list[dict[str, Any]]:
+        """Search with multiple queries and deduplicate results."""
+        results = tools.search_multi(queries, top_k)
+        return [
+            {
+                "chunk_id": r.chunk_id,
+                "source_id": r.source_id,
+                "filename": r.filename,
+                "text": r.text,
+                "score": r.score,
+                "metadata": r.metadata,
+            }
+            for r in results
+        ]
+
+    @mcp.tool()
+    def evaluate_chunks(query: str, results: list[dict[str, Any]]) -> dict[str, Any]:
+        """Score each chunk's relevance to the original query."""
+        search_results = [
+            SearchResult(
+                chunk_id=r["chunk_id"],
+                source_id=r["source_id"],
+                filename=r["filename"],
+                text=r["text"],
+                score=r["score"],
+                metadata=r.get("metadata", {}),
+            )
+            for r in results
+        ]
+        report = tools.evaluate_chunks(query, search_results)
+        return {
+            "query": report.query,
+            "scored_chunks": [
+                {
+                    "chunk_id": cs.chunk_id,
+                    "source_id": cs.source_id,
+                    "score": cs.score,
+                    "reason": cs.reason,
+                }
+                for cs in report.scored_chunks
+            ],
+            "sufficient": report.sufficient,
+            "suggested_queries": report.suggested_queries,
         }
 
     # Create FastAPI app and mount MCP SSE transport

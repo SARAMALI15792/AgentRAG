@@ -1,4 +1,4 @@
-"""File reader — converts local files to RawDocument."""
+"""File reader — converts local files to RawDocument via the plugin registry."""
 
 from __future__ import annotations
 
@@ -12,11 +12,10 @@ import pymupdf
 from bs4 import BeautifulSoup
 from docx import Document
 
+from agentrag.ingestion import reader_registry
 from agentrag.types import RawDocument
 
 logger = logging.getLogger(__name__)
-
-_SUPPORTED = {".pdf", ".txt", ".md", ".docx", ".html", ".py", ".ipynb"}
 
 
 def read_file(path: Path) -> RawDocument:
@@ -25,21 +24,9 @@ def read_file(path: Path) -> RawDocument:
         raise FileNotFoundError(f"File not found: {path}")
 
     suffix = path.suffix.lower()
-    if suffix not in _SUPPORTED:
-        raise ValueError(f"Unsupported file type: {suffix}")
-
+    reader_fn = reader_registry.get_reader(suffix)
     source_id = hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:16]
-
-    if suffix == ".pdf":
-        text = _read_pdf(path)
-    elif suffix == ".docx":
-        text = _read_docx(path)
-    elif suffix == ".html":
-        text = _read_html(path)
-    elif suffix == ".ipynb":
-        text = _read_ipynb(path)
-    else:  # .txt, .md, .py
-        text = path.read_text(encoding="utf-8")
+    text = reader_fn(path)
 
     if not text.strip():
         raise ValueError(f"File is empty: {path}")
@@ -88,3 +75,16 @@ def _read_ipynb(path: Path) -> str:
             text = source if isinstance(source, str) else "".join(source)
             parts.append(text)
     return "\n\n".join(parts)
+
+
+def _read_plaintext(path: Path) -> str:
+    """Read a plain text file as UTF-8."""
+    return path.read_text(encoding="utf-8")
+
+
+# Register all Tier 1 readers
+reader_registry.register([".txt", ".md", ".py"], _read_plaintext)
+reader_registry.register([".pdf"], _read_pdf)
+reader_registry.register([".docx"], _read_docx)
+reader_registry.register([".html"], _read_html)
+reader_registry.register([".ipynb"], _read_ipynb)

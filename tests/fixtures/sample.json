@@ -1,0 +1,31 @@
+{
+    "project": {
+        "name": "AgentRAG",
+        "version": "1.0.0",
+        "description": "Agentic RAG MCP Server for semantic document retrieval",
+        "authors": ["Alice Johnson", "Bob Smith"],
+        "tags": ["rag", "mcp", "semantic-search", "vector-store"]
+    },
+    "configuration": {
+        "embedding": {
+            "model": "all-MiniLM-L6-v2",
+            "dimensions": 384,
+            "batch_size": 32
+        },
+        "chunking": {
+            "size": 512,
+            "overlap": 64
+        },
+        "storage": {
+            "backend": "qdrant",
+            "collection": "documents",
+            "persist": true
+        }
+    },
+    "supported_formats": [".pdf", ".docx", ".html", ".txt", ".xlsx", ".epub"],
+    "performance": {
+        "ingest_timeout_seconds": 300,
+        "max_file_size_mb": 100,
+        "retrieval_top_k": 5
+    }
+}

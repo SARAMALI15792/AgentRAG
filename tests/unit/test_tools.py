@@ -100,21 +100,18 @@ def test_ingest_file_nonexistent_path_returns_error() -> None:
 def test_ingest_directory_delegates_to_pipeline_per_file(
     mock_pipeline: MagicMock,
 ) -> None:
-    """ingest_directory delegates to pipeline for each file."""
+    """ingest_directory delegates to pipeline for each matched file."""
+    _file_map = {
+        "*.txt": [Path("/tmp/a.txt")],
+        "*.md": [Path("/tmp/b.md")],
+        "*.pdf": [Path("/tmp/c.pdf")],
+    }
+
     with patch("agentrag.server.tools.ingest", mock_pipeline):
         with patch("agentrag.server.tools.Path") as mock_path_class:
             mock_dir = MagicMock()
             mock_dir.is_dir.return_value = True
-            # rglob called once per extension (7 total); 3 return files, 4 empty
-            mock_dir.rglob.side_effect = [
-                [Path("/tmp/a.txt")],
-                [Path("/tmp/b.md")],
-                [Path("/tmp/c.pdf")],
-                [],
-                [],
-                [],
-                [],
-            ]
+            mock_dir.rglob.side_effect = lambda pat: _file_map.get(pat, [])
             mock_path_class.return_value = mock_dir
 
             results = ingest_directory(directory_path="/tmp")
