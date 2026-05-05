@@ -7,14 +7,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from agentrag.config import Settings
 from agentrag.server.tools import (
+    create_collection,
     delete_source,
     get_document,
     ingest_directory,
     ingest_file,
+    list_collections,
     list_sources,
     search_by_metadata,
     search_documents,
+    search_stream,
+    switch_collection,
 )
 from agentrag.types import (
     IngestResult,
@@ -235,3 +240,112 @@ def test_ingest_directory_all_seven_types(
     assert len(results) == 7
     assert mock_pipeline.call_count == 7
     assert all(r.status == "ok" for r in results)
+
+
+# Phase 6 — multi-collection and streaming tool tests
+
+
+@pytest.fixture
+def mock_store_with_collections() -> MagicMock:
+    """Mock QdrantStore with list_collections and create_collection support."""
+    store = MagicMock()
+    store.list_collections.return_value = ["documents"]
+    store.create_collection.return_value = None
+    return store
+
+
+def test_list_collections_returns_list(
+    mock_store_with_collections: MagicMock,
+) -> None:
+    """list_collections delegates to store.list_collections."""
+    with patch(
+        "agentrag.server.tools.QdrantStore", return_value=mock_store_with_collections
+    ):
+        result = list_collections()
+    assert isinstance(result, list)
+    assert "documents" in result
+    mock_store_with_collections.list_collections.assert_called_once()
+
+
+def test_create_collection_returns_created_message(
+    mock_store_with_collections: MagicMock,
+) -> None:
+    """create_collection returns 'created' message for a new collection name."""
+    mock_store_with_collections.list_collections.return_value = ["documents"]
+    with patch(
+        "agentrag.server.tools.QdrantStore", return_value=mock_store_with_collections
+    ):
+        result = create_collection("new_ws")
+    assert "new_ws" in result
+    assert "created" in result.lower()
+
+
+def test_create_collection_returns_exists_message_when_duplicate(
+    mock_store_with_collections: MagicMock,
+) -> None:
+    """create_collection returns 'already exists' when name is already present."""
+    mock_store_with_collections.list_collections.return_value = ["documents", "new_ws"]
+    with patch(
+        "agentrag.server.tools.QdrantStore", return_value=mock_store_with_collections
+    ):
+        result = create_collection("new_ws")
+    assert "already exists" in result.lower()
+    mock_store_with_collections.create_collection.assert_not_called()
+
+
+def test_create_collection_invalid_name_raises_valueerror() -> None:
+    """create_collection raises ValueError for names with invalid characters."""
+    with pytest.raises(ValueError, match="invalid characters"):
+        create_collection("invalid name!")
+
+
+def test_switch_collection_returns_confirmation(
+    mock_store_with_collections: MagicMock,
+    settings: Settings,
+) -> None:
+    """switch_collection mutates settings.collection and returns confirmation."""
+    import agentrag.server.tools as tools_module
+
+    original = settings.collection
+    mock_store_with_collections.list_collections.return_value = ["documents", "ws_x"]
+    with patch(
+        "agentrag.server.tools.QdrantStore", return_value=mock_store_with_collections
+    ):
+        with patch.object(tools_module, "_active_settings", settings):
+            result = switch_collection("ws_x")
+    assert "ws_x" in result
+    assert settings.collection == "ws_x"
+    settings.collection = original  # restore
+
+
+def test_switch_collection_nonexistent_raises_valueerror(
+    mock_store_with_collections: MagicMock,
+    settings: Settings,
+) -> None:
+    """switch_collection raises ValueError when collection does not exist."""
+    import agentrag.server.tools as tools_module
+
+    mock_store_with_collections.list_collections.return_value = ["documents"]
+    with patch(
+        "agentrag.server.tools.QdrantStore", return_value=mock_store_with_collections
+    ):
+        with patch.object(tools_module, "_active_settings", settings):
+            with pytest.raises(ValueError, match="does not exist"):
+                switch_collection("nonexistent_xyz")
+
+
+def test_search_stream_returns_same_as_search_documents(
+    mock_searcher: MagicMock,
+) -> None:
+    """search_stream returns same results as search_documents (batch fallback)."""
+    with patch("agentrag.server.tools.search", mock_searcher):
+        batch = search_documents(query="test", top_k=3)
+    with patch("agentrag.server.tools.search", mock_searcher):
+        streamed = search_stream(query="test", top_k=3)
+    assert [r.chunk_id for r in batch] == [r.chunk_id for r in streamed]
+
+
+def test_search_stream_empty_query_raises_valueerror() -> None:
+    """search_stream raises ValueError on empty query string."""
+    with pytest.raises(ValueError, match="query must not be empty"):
+        search_stream(query="", top_k=5)

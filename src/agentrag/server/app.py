@@ -29,11 +29,11 @@ async def app_lifespan(mcp: FastMCP) -> AsyncIterator[AppContext]:
     """Manage application lifecycle — initialize resources at startup."""
     settings = Settings()
     store = QdrantStore(settings)
+    tools.set_active_settings(settings)  # share mutable instance with all handlers
 
     try:
         yield AppContext(settings=settings, store=store)
     finally:
-        # Cleanup if needed (Qdrant embedded client closes automatically)
         pass
 
 
@@ -203,6 +203,39 @@ def create_app() -> tuple[FastAPI, FastMCP]:
             "sufficient": report.sufficient,
             "suggested_queries": report.suggested_queries,
         }
+
+    # Phase 6 — multi-collection and streaming tools
+
+    @mcp.tool()
+    def list_collections() -> list[str]:
+        """List all named Qdrant collections."""
+        return tools.list_collections()
+
+    @mcp.tool()
+    def create_collection(name: str) -> str:
+        """Create a new named collection for workspace isolation (idempotent)."""
+        return tools.create_collection(name)
+
+    @mcp.tool()
+    def switch_collection(name: str) -> str:
+        """Set the active collection for all subsequent operations this session."""
+        return tools.switch_collection(name)
+
+    @mcp.tool()
+    def search_stream(query: str, top_k: int = 5) -> list[dict[str, Any]]:
+        """Streaming semantic search — batch fallback until MCP SDK supports async."""
+        results = tools.search_stream(query, top_k)
+        return [
+            {
+                "chunk_id": r.chunk_id,
+                "source_id": r.source_id,
+                "filename": r.filename,
+                "text": r.text,
+                "score": r.score,
+                "metadata": r.metadata,
+            }
+            for r in results
+        ]
 
     # Create FastAPI app and mount MCP SSE transport
     app = FastAPI(title="AgentRAG MCP Server")

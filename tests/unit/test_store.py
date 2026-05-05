@@ -113,3 +113,48 @@ def test_filter_sources_multiple_criteria(settings: Settings) -> None:
     results = store.filter_sources({"filename": "doc.txt", "source_id": "src1"})
     assert len(results) == 1
     assert results[0].source_id == "src1"
+
+
+# Phase 6 — multi-collection tests
+
+
+def test_two_collections_are_isolated(settings: Settings) -> None:
+    """Data upserted into collection A is not visible when querying collection B."""
+    store = QdrantStore(settings)  # creates "documents" collection
+    chunks = _make_chunks("src_iso", 3)
+    store.upsert(chunks)
+
+    # Switch active collection to workspace_b
+    settings.collection = "workspace_b"
+    store_b = QdrantStore(settings)  # creates workspace_b
+    results_b = store_b.query(chunks[0].vector, top_k=5)
+    assert results_b == [], "workspace_b should be empty"
+
+    # Switch back — original store now targets documents again
+    settings.collection = "documents"
+    results_a = store.query(chunks[0].vector, top_k=5)
+    assert len(results_a) > 0, "documents collection should still have data"
+
+
+def test_create_collection_creates_new_qdrant_collection(settings: Settings) -> None:
+    """create_collection produces a collection visible to list_collections."""
+    store = QdrantStore(settings)
+    store.create_collection("brand_new")
+    collections = store.list_collections()
+    assert "brand_new" in collections
+
+
+def test_list_collections_returns_default(settings: Settings) -> None:
+    """list_collections includes the default collection created at init."""
+    store = QdrantStore(settings)
+    collections = store.list_collections()
+    assert isinstance(collections, list)
+    assert settings.collection in collections
+
+
+def test_create_collection_idempotent(settings: Settings) -> None:
+    """create_collection called twice on the same name raises no exception."""
+    store = QdrantStore(settings)
+    store.create_collection("dup_ws")
+    store.create_collection("dup_ws")  # must not raise
+    assert "dup_ws" in store.list_collections()
