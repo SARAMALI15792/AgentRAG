@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import uuid
 from datetime import UTC, datetime
@@ -18,7 +19,7 @@ from qdrant_client.models import (
 from agentrag.config import Settings
 from agentrag.types import EmbeddedChunk, SearchResult, SourceInfo
 
-_COLLECTION = "documents"  # single Qdrant collection for all ingested content
+logger = logging.getLogger(__name__)
 
 # One QdrantClient per path — Linux portalocker forbids multiple clients on same path.
 _client_cache: dict[str, QdrantClient] = {}
@@ -28,11 +29,23 @@ _cache_lock = threading.Lock()
 _upsert_locks: dict[str, threading.Lock] = {}
 
 
+def _close_all_clients() -> None:
+    """Close all cached Qdrant clients and clear the cache (test/cleanup helper)."""
+    with _cache_lock:
+        for client in list(_client_cache.values()):
+            try:
+                client.close()
+            except Exception as exc:
+                logger.warning("Failed to close Qdrant client: %s", exc)
+        _client_cache.clear()
+        _upsert_locks.clear()
+
+
 class QdrantStore:
     """Persistent vector store backed by Qdrant embedded (in-process, no server)."""
 
     def __init__(self, settings: Settings) -> None:
-        """Open or create the Qdrant collection at settings.data_dir/qdrant."""
+        """Open or create the Qdrant collection named by settings.collection."""
         from pathlib import Path
 
         qdrant_path = str((settings.data_dir / "qdrant").resolve())
@@ -44,14 +57,34 @@ class QdrantStore:
                 _upsert_locks[qdrant_path] = threading.Lock()
         self._client = _client_cache[qdrant_path]
         self._upsert_lock = _upsert_locks[qdrant_path]
+        self._settings = settings  # live reference — collection name read at call time
         self._vector_dim = settings.vector_dim
-        if not self._client.collection_exists(_COLLECTION):
+        if not self._client.collection_exists(settings.collection):
             self._client.create_collection(
-                _COLLECTION,
+                settings.collection,
                 vectors_config=VectorParams(
                     size=self._vector_dim, distance=Distance.COSINE
                 ),
             )
+
+    @property
+    def _active_collection(self) -> str:
+        """Current collection name from live settings."""
+        return self._settings.collection
+
+    def create_collection(self, name: str) -> None:
+        """Create a named collection if it does not already exist (idempotent)."""
+        if not self._client.collection_exists(name):
+            self._client.create_collection(
+                name,
+                vectors_config=VectorParams(
+                    size=self._vector_dim, distance=Distance.COSINE
+                ),
+            )
+
+    def list_collections(self) -> list[str]:
+        """Return alphabetically sorted list of all collection names."""
+        return sorted(c.name for c in self._client.get_collections().collections)
 
     def upsert(self, chunks: list[EmbeddedChunk]) -> None:
         """Replace all stored chunks for the source with the new set (idempotent)."""
@@ -75,7 +108,7 @@ class QdrantStore:
         ]
         with self._upsert_lock:
             self._delete_by_source(chunks[0].source_id)
-            self._client.upsert(_COLLECTION, points=points, wait=True)
+            self._client.upsert(self._active_collection, points=points, wait=True)
 
     def query(
         self,
@@ -93,7 +126,7 @@ class QdrantStore:
                 ]
             )
         response = self._client.query_points(
-            _COLLECTION,
+            self._active_collection,
             query=vector,
             limit=top_k,
             query_filter=query_filter,
@@ -128,7 +161,7 @@ class QdrantStore:
     def delete(self, source_id: str) -> int:
         """Delete all chunks for source_id and return the count removed."""
         count_result = self._client.count(
-            _COLLECTION,
+            self._active_collection,
             count_filter=Filter(
                 must=[
                     FieldCondition(key="source_id", match=MatchValue(value=source_id))
@@ -147,7 +180,7 @@ class QdrantStore:
         offset: Any = None  # Any: PointId union type varies by qdrant-client version
         while True:
             points, next_offset = self._client.scroll(
-                _COLLECTION,
+                self._active_collection,
                 limit=256,
                 offset=offset,
                 with_payload=True,
@@ -187,7 +220,7 @@ class QdrantStore:
     def _delete_by_source(self, source_id: str) -> None:
         """Remove all Qdrant points whose payload source_id matches."""
         self._client.delete(
-            _COLLECTION,
+            self._active_collection,
             points_selector=Filter(
                 must=[
                     FieldCondition(key="source_id", match=MatchValue(value=source_id))
