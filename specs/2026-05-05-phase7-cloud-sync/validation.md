@@ -191,7 +191,13 @@ uvx agentrag sync status --help
 the README. A new user with only `uv` installed runs this one command and
 has a running MCP server — no `pip install`, no `python -m`, no venv.
 
-**Validation:**
+**Credential check (required before tagging):**
+- [ ] User provides PyPI API token — ask before proceeding, never assume
+- [ ] `PYPI_TOKEN` secret added to GitHub Actions repo secrets
+- [ ] CI publish job confirmed to read `secrets.PYPI_TOKEN` (not hardcoded)
+- [ ] Token scope confirmed: project-scoped (`agentrag`) preferred
+
+**Publish validation:**
 - [ ] `git tag v0.1.0 && git push origin v0.1.0` triggers CI publish job
 - [ ] CI publish job exits 0 (package on PyPI)
 - [ ] `uvx agentrag serve --help` works from PyPI (not local wheel)
@@ -209,4 +215,5 @@ Phase 7 is done when:
 3. Manual S3 roundtrip completed and confirmed
 4. `specs/tech-stack.md` updated with new deps and env vars
 5. PR merged to `main` with CI green
-6. `git tag v0.1.0` pushed — PyPI CI job green — `uvx agentrag` works from PyPI
+6. PyPI credentials gathered from user → `PYPI_TOKEN` set in GitHub secrets
+7. `git tag v0.1.0` pushed — PyPI CI job green — `uvx agentrag` works from PyPI

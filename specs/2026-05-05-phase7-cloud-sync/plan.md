@@ -121,11 +121,31 @@ backend (Step 1) — the abstraction must be proven locally first.
 
 This step runs after the PR is merged to `main` and CI is green.
 
+### 8a — Credential Gathering (ask user before proceeding)
+
+**Stop and ask the user for the following before running any publish command:**
+
+- [ ] Ask user for PyPI API token (`pypi-AgentRAG-...` format).
+      User confirmed they have credentials.
+- [ ] Confirm token scope: project-scoped token for `agentrag` on PyPI, or
+      account-scoped token. Project-scoped is preferred — narrower blast radius.
+- [ ] Add token as `PYPI_TOKEN` secret in GitHub Actions:
+      GitHub → repo Settings → Secrets → Actions → New secret → `PYPI_TOKEN`
+- [ ] Verify `.github/workflows/ci.yml` publish job reads `PYPI_TOKEN` from
+      secrets: `uv publish --token ${{ secrets.PYPI_TOKEN }}`
+- [ ] Confirm secret is set before pushing the tag — pushing `v0.1.0` without
+      the secret configured will fail the CI publish job
+
+### 8b — Build and Local Validation
+
 - [ ] Confirm `uv run python -m build` produces clean wheel with zero warnings
 - [ ] Confirm `uvx --from ./dist/agentrag-0.1.0-*.whl agentrag serve --help`
       exits 0 (zero-install entry point works)
 - [ ] Confirm `uvx --from ./dist/agentrag-0.1.0-*.whl agentrag sync --help`
       exits 0 (sync commands present in published wheel)
+
+### 8c — Tag and Publish
+
 - [ ] Run `git tag v0.1.0 && git push origin v0.1.0`
       — triggers CI publish workflow (`uv build` → `uv publish` → PyPI)
 - [ ] Confirm PyPI publish job green in GitHub Actions
