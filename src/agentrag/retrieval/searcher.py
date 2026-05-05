@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from sentence_transformers import SentenceTransformer
-
 from agentrag.config import Settings
+from agentrag.ingestion.embedder import _get_model
+from agentrag.retrieval import reranker
 from agentrag.store.qdrant import QdrantStore
 from agentrag.types import SearchResult
 
@@ -17,19 +17,12 @@ def search(
     settings: Settings,
     filters: dict[str, Any] | None = None,
 ) -> list[SearchResult]:
-    """Embed query and return top_k results ranked by cosine similarity."""
-    # Embed query using same model as ingestion
-    model = SentenceTransformer(settings.embed_model)
+    """Embed query, retrieve top_k results, and rerank if enabled."""
+    model = _get_model(settings.embed_model)
     vectors = model.encode([query])
-    # Handle both numpy array (real) and list (mock) return types
-    if hasattr(vectors[0], "tolist"):
-        query_vector = vectors[0].tolist()
-    else:
-        query_vector = vectors[0]
+    raw = vectors[0]
+    query_vector: list[float] = raw.tolist() if hasattr(raw, "tolist") else list(raw)
 
-    # Query store
     store = QdrantStore(settings)
     results = store.query(vector=query_vector, top_k=top_k, filters=filters)
-
-    # Results already sorted by score descending from store.query
-    return results
+    return reranker.rerank(query, results, settings)

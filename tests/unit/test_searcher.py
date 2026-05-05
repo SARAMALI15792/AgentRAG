@@ -1,4 +1,4 @@
-"""Unit tests for retrieval/searcher.py — store is mocked."""
+"""Unit tests for retrieval/searcher.py — store and embedder are mocked."""
 
 from __future__ import annotations
 
@@ -50,21 +50,21 @@ def mock_store() -> MagicMock:
     return store
 
 
-@pytest.fixture
-def mock_embedder() -> MagicMock:
-    """Mock embed_chunks to return deterministic query vector."""
-    mock = MagicMock()
-    mock.return_value = [[0.1] * 384]  # Single query embedding
-    return mock
+def _mock_model() -> MagicMock:
+    """Shared model mock returning a deterministic query vector."""
+    model = MagicMock()
+    model.encode.return_value = [[0.1] * 384]
+    return model
 
 
 def test_search_returns_results_sorted_by_score_descending(
-    settings: Settings, mock_store: MagicMock, mock_embedder: MagicMock
+    settings: Settings, mock_store: MagicMock
 ) -> None:
     """Query returns list[SearchResult] sorted by score descending."""
     with patch("agentrag.retrieval.searcher.QdrantStore", return_value=mock_store):
-        with patch("agentrag.retrieval.searcher.SentenceTransformer") as mock_st_class:
-            mock_st_class.return_value.encode = mock_embedder
+        with patch(
+            "agentrag.retrieval.searcher._get_model", return_value=_mock_model()
+        ):
             results = search("test query", top_k=10, settings=settings)
 
     assert len(results) == 3
@@ -74,48 +74,45 @@ def test_search_returns_results_sorted_by_score_descending(
     assert results[0].text == "First result"
 
 
-def test_search_respects_top_k_limit(
-    settings: Settings, mock_store: MagicMock, mock_embedder: MagicMock
-) -> None:
+def test_search_respects_top_k_limit(settings: Settings, mock_store: MagicMock) -> None:
     """top_k parameter limits result count exactly."""
     with patch("agentrag.retrieval.searcher.QdrantStore", return_value=mock_store):
-        with patch("agentrag.retrieval.searcher.SentenceTransformer") as mock_st_class:
-            mock_st_class.return_value.encode = mock_embedder
+        with patch(
+            "agentrag.retrieval.searcher._get_model", return_value=_mock_model()
+        ):
             search("test query", top_k=2, settings=settings)
 
-    # Store receives top_k=2 in query call
     mock_store.query.assert_called_once()
     call_args = mock_store.query.call_args
     assert call_args[1]["top_k"] == 2
 
 
-def test_search_empty_store_returns_empty_list(
-    settings: Settings, mock_embedder: MagicMock
-) -> None:
+def test_search_empty_store_returns_empty_list(settings: Settings) -> None:
     """Store returns empty list → searcher returns empty list, no exception."""
     empty_store = MagicMock()
     empty_store.query.return_value = []
 
     with patch("agentrag.retrieval.searcher.QdrantStore", return_value=empty_store):
-        with patch("agentrag.retrieval.searcher.SentenceTransformer") as mock_st_class:
-            mock_st_class.return_value.encode = mock_embedder
+        with patch(
+            "agentrag.retrieval.searcher._get_model", return_value=_mock_model()
+        ):
             results = search("test query", top_k=5, settings=settings)
 
     assert results == []
 
 
 def test_search_forwards_metadata_filters_unchanged(
-    settings: Settings, mock_store: MagicMock, mock_embedder: MagicMock
+    settings: Settings, mock_store: MagicMock
 ) -> None:
     """Metadata filters dict is forwarded to store query unchanged."""
     filters = {"filename": "test.txt", "source_id": "abc"}
 
     with patch("agentrag.retrieval.searcher.QdrantStore", return_value=mock_store):
-        with patch("agentrag.retrieval.searcher.SentenceTransformer") as mock_st_class:
-            mock_st_class.return_value.encode = mock_embedder
+        with patch(
+            "agentrag.retrieval.searcher._get_model", return_value=_mock_model()
+        ):
             search("test query", top_k=5, settings=settings, filters=filters)
 
-    # Verify filters passed to store.query
     mock_store.query.assert_called_once()
     call_args = mock_store.query.call_args
     assert call_args[1]["filters"] == filters

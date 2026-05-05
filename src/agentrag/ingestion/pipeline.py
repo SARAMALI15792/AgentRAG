@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
+from typing import Any
 
 from agentrag.config import Settings
 from agentrag.ingestion.chunker import chunk_document
@@ -57,7 +58,8 @@ def ingest_raw(doc: RawDocument, settings: Settings) -> IngestResult:
     """Ingest a pre-built RawDocument: chunk → embed → store. Never raises."""
     try:
         chunks = chunk_document(doc, settings)
-        metadata = {"filename": doc.filename}
+        # Merge doc.metadata so custom tags survive into EmbeddedChunk.metadata.
+        metadata: dict[str, Any] = {**doc.metadata, "filename": doc.filename}
         embedded_chunks = embed_chunks(chunks, settings, metadata=metadata)
         store = QdrantStore(settings)
         store.upsert(embedded_chunks)
