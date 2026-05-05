@@ -430,11 +430,16 @@ running MCP server in under 60 seconds.
 
 ---
 
-**Step 5 — Publish**
+**Step 5 — Publish workflow (CI only — tag deferred)**
 
-- [ ] `git tag v0.1.0 && git push origin v0.1.0` → triggers CI publish job
-- [ ] `pip install agentrag` on a clean machine → `agentrag serve` starts without error
-- [ ] `uvx agentrag serve` on a clean machine → server starts without error
+- [ ] GitHub Actions publish job defined, syntactically valid, triggered on `v*` tag push
+- [ ] `PYPI_TOKEN` secret documented (configured at publish time, post-Phase 7)
+- [ ] `uvx --from ./dist/agentrag-0.1.0-*.whl agentrag serve --help` works from local wheel
+
+> **Decision (2026-05-05):** Actual `git tag v0.1.0` push is deferred until Phase 7
+> (Cloud Sync) is complete. `mission.md` lists cloud sync and workspace isolation as
+> core goals — publishing before they exist would ship an incomplete product.
+> See `specs/2026-05-05-phase5-distribution/requirements.md` for full rationale.
 
 ---
 
@@ -442,9 +447,10 @@ running MCP server in under 60 seconds.
 
 - [ ] `scripts/verify_phase5.sh`
 
-**Exit condition:** `pip install agentrag && agentrag serve` works on a clean machine.
-`uvx agentrag serve` works. CI matrix green across Python 3.12 and 3.13.
-PyPI package published at `https://pypi.org/project/agentrag/`.
+**Exit condition:** Wheel builds clean (`uv run python -m build` zero warnings).
+`uvx` entry point works from local wheel. CI publish job defined and valid.
+CI matrix green across Python 3.12 and 3.13. README and CHANGELOG complete.
+PyPI publish deferred to post-Phase 7 exit gate.
 
 ---
 
