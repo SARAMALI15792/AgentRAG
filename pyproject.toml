@@ -6,7 +6,17 @@ build-backend = "hatchling.build"
 name = "agentrag"
 version = "0.1.0"
 description = "Agentic RAG MCP Server — persistent semantic memory over private data"
+license = { text = "MIT" }
 requires-python = ">=3.12"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp==1.27.0",
     "fastapi>=0.136.0,<0.137.0",
@@ -22,6 +32,11 @@ dependencies = [
     "google-genai>=1.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/SARAMALI15792/AgentRAG"
+Repository = "https://github.com/SARAMALI15792/AgentRAG"
+Issues = "https://github.com/SARAMALI15792/AgentRAG/issues"
+
 [project.optional-dependencies]
 dev = [
     "black>=25.0,<26.0",
@@ -32,6 +47,7 @@ dev = [
     "pytest-cov>=5.0",
     "httpx>=0.27.0",
     "hatchling",
+    "build>=1.2",
     "numpy>=1.26",
     "types-beautifulsoup4",
     "types-PyYAML",
