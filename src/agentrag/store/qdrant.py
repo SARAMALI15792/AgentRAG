@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -19,17 +20,31 @@ from agentrag.types import EmbeddedChunk, SearchResult, SourceInfo
 
 _COLLECTION = "documents"  # single Qdrant collection for all ingested content
 
+# One QdrantClient per path — Linux portalocker forbids multiple clients on same path.
+_client_cache: dict[str, QdrantClient] = {}
+_cache_lock = threading.Lock()
+
+# Per-path lock serialises delete+upsert so concurrent ingests stay idempotent.
+_upsert_locks: dict[str, threading.Lock] = {}
+
 
 class QdrantStore:
     """Persistent vector store backed by Qdrant embedded (in-process, no server)."""
 
     def __init__(self, settings: Settings) -> None:
         """Open or create the Qdrant collection at settings.data_dir/qdrant."""
-        qdrant_path = settings.data_dir / "qdrant"
-        qdrant_path.mkdir(parents=True, exist_ok=True)
-        self._client = QdrantClient(path=str(qdrant_path))
+        from pathlib import Path
+
+        qdrant_path = str((settings.data_dir / "qdrant").resolve())
+        with _cache_lock:
+            if qdrant_path not in _client_cache:
+                Path(qdrant_path).mkdir(parents=True, exist_ok=True)
+                _client_cache[qdrant_path] = QdrantClient(path=qdrant_path)
+            if qdrant_path not in _upsert_locks:
+                _upsert_locks[qdrant_path] = threading.Lock()
+        self._client = _client_cache[qdrant_path]
+        self._upsert_lock = _upsert_locks[qdrant_path]
         self._vector_dim = settings.vector_dim
-        # Create collection only on first run; leave existing data intact on restart.
         if not self._client.collection_exists(_COLLECTION):
             self._client.create_collection(
                 _COLLECTION,
@@ -42,12 +57,9 @@ class QdrantStore:
         """Replace all stored chunks for the source with the new set (idempotent)."""
         if not chunks:
             return
-        # Delete first so re-ingesting the same file never accumulates duplicates.
-        self._delete_by_source(chunks[0].source_id)
         ingested_at = datetime.now(UTC).isoformat()
         points = [
             PointStruct(
-                # uuid5: deterministic ID per chunk_id — stable across re-ingests.
                 id=str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk.chunk_id)),
                 vector=chunk.vector,
                 payload={
@@ -61,7 +73,9 @@ class QdrantStore:
             )
             for chunk in chunks
         ]
-        self._client.upsert(_COLLECTION, points=points, wait=True)
+        with self._upsert_lock:
+            self._delete_by_source(chunks[0].source_id)
+            self._client.upsert(_COLLECTION, points=points, wait=True)
 
     def query(
         self,
@@ -72,7 +86,6 @@ class QdrantStore:
         """Return up to top_k chunks ranked by cosine similarity to vector."""
         query_filter: Filter | None = None
         if filters:
-            # Each key-value pair in filters becomes a must-match condition.
             query_filter = Filter(
                 must=[
                     FieldCondition(key=k, match=MatchValue(value=v))
@@ -114,7 +127,6 @@ class QdrantStore:
 
     def delete(self, source_id: str) -> int:
         """Delete all chunks for source_id and return the count removed."""
-        # Count first so the caller knows whether the source existed.
         count_result = self._client.count(
             _COLLECTION,
             count_filter=Filter(
@@ -134,7 +146,6 @@ class QdrantStore:
         sources: dict[str, SourceInfo] = {}
         offset: Any = None  # Any: PointId union type varies by qdrant-client version
         while True:
-            # Paginate with scroll; next_offset is None when the last page is reached.
             points, next_offset = self._client.scroll(
                 _COLLECTION,
                 limit=256,
@@ -162,21 +173,15 @@ class QdrantStore:
 
     def get_full_document(self, source_id: str) -> tuple[str, str, str, dict[str, Any]]:
         """Retrieve all chunks for source_id and return assembled document."""
-        # Query all chunks for this source_id
         results = self.query(
-            vector=[0.0] * self._vector_dim,  # dummy vector — filter by source_id
-            top_k=10000,  # large limit to get all chunks
+            vector=[0.0] * self._vector_dim,
+            top_k=10000,
             filters={"source_id": source_id},
         )
-
         if not results:
             raise ValueError(f"source_id {source_id!r} not found")
-
-        # Sort by chunk_id to preserve order (chunk_id format: "{source_id}_{index}")
         results.sort(key=lambda r: r.chunk_id)
-
         full_text = "".join(r.text for r in results)
-
         return results[0].filename, full_text, source_id, results[0].metadata
 
     def _delete_by_source(self, source_id: str) -> None:
