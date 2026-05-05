@@ -114,3 +114,25 @@ backend (Step 1) — the abstraction must be proven locally first.
 - [ ] All checks pass: black, ruff, mypy, pytest, phase-specific smoke tests
 - [ ] Manual cloud roundtrip verified before PR merge
 - [ ] Push branch, open PR against `main`
+
+---
+
+## Step 8 — PyPI Publish (Phase 7 Exit Triggers v0.1.0)
+
+This step runs after the PR is merged to `main` and CI is green.
+
+- [ ] Confirm `uv run python -m build` produces clean wheel with zero warnings
+- [ ] Confirm `uvx --from ./dist/agentrag-0.1.0-*.whl agentrag serve --help`
+      exits 0 (zero-install entry point works)
+- [ ] Confirm `uvx --from ./dist/agentrag-0.1.0-*.whl agentrag sync --help`
+      exits 0 (sync commands present in published wheel)
+- [ ] Run `git tag v0.1.0 && git push origin v0.1.0`
+      — triggers CI publish workflow (`uv build` → `uv publish` → PyPI)
+- [ ] Confirm PyPI publish job green in GitHub Actions
+- [ ] Confirm `uvx agentrag serve --help` works from PyPI (zero-install,
+      no local wheel — this is the user-facing `npx`-equivalent flow):
+      ```bash
+      uvx agentrag serve --help
+      uvx agentrag sync push --help
+      ```
+- [ ] Update `specs/roadmap.md` — mark Phase 7 complete, record PyPI publish date

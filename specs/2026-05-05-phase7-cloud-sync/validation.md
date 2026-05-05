@@ -24,11 +24,17 @@ uv run mypy --strict src/
 echo "[4/5] Pytest..."
 uv run pytest --tb=short -q
 
-echo "[5/5] Phase 7 smoke tests..."
+echo "[5/6] Phase 7 smoke tests..."
 # Local backend roundtrip via CLI
 uv run agentrag sync push
 uv run agentrag sync status
 uv run agentrag sync pull
+
+echo "[6/6] uvx zero-install re-validation..."
+uv run python -m build --quiet
+uvx --from ./dist/agentrag-0.1.0-*.whl agentrag serve --help
+uvx --from ./dist/agentrag-0.1.0-*.whl agentrag sync push --help
+uvx --from ./dist/agentrag-0.1.0-*.whl agentrag sync pull --help
 
 echo "=== Phase 7 Exit Gate: PASSED ==="
 ```
@@ -151,13 +157,56 @@ All five steps must succeed before the PR is opened.
 
 ---
 
+## PyPI Publish — Formal Deliverable
+
+Phase 7 exit triggers the `v0.1.0` PyPI release. This is not optional.
+
+**Sequence (after PR merges to `main`):**
+
+```bash
+# 1. Tag the release
+git tag v0.1.0
+git push origin v0.1.0
+# → triggers CI publish workflow: uv build → uv publish → PyPI
+
+# 2. Confirm publish job green in GitHub Actions
+
+# 3. Verify the npx-equivalent zero-install flow from PyPI
+uvx agentrag serve --help
+uvx agentrag sync push --help
+uvx agentrag sync pull --help
+uvx agentrag sync status --help
+```
+
+**Why `uvx` is the `npx` equivalent:**
+
+| Node.js | Python (AgentRAG) |
+|---|---|
+| `npx some-tool` | `uvx agentrag serve` |
+| No install needed | No install needed |
+| Downloads + runs from registry | Downloads + runs from PyPI |
+| `package.json` entry point | `pyproject.toml` entry point |
+
+`uvx agentrag serve` is the user-facing zero-install command documented in
+the README. A new user with only `uv` installed runs this one command and
+has a running MCP server — no `pip install`, no `python -m`, no venv.
+
+**Validation:**
+- [ ] `git tag v0.1.0 && git push origin v0.1.0` triggers CI publish job
+- [ ] CI publish job exits 0 (package on PyPI)
+- [ ] `uvx agentrag serve --help` works from PyPI (not local wheel)
+- [ ] `uvx agentrag sync push --help` works from PyPI
+- [ ] `uvx agentrag ingest --help` works from PyPI
+
+---
+
 ## Definition of Done
 
 Phase 7 is done when:
 
-1. `scripts/verify_phase7.sh` exits 0 in CI (local backend smoke tests pass)
+1. `scripts/verify_phase7.sh` exits 0 in CI (including uvx re-validation)
 2. All functional criteria above are checked off
 3. Manual S3 roundtrip completed and confirmed
 4. `specs/tech-stack.md` updated with new deps and env vars
 5. PR merged to `main` with CI green
-6. PyPI publish tag (`v0.1.0`) can now be pushed (Phase 7 was the last gate)
+6. `git tag v0.1.0` pushed — PyPI CI job green — `uvx agentrag` works from PyPI
