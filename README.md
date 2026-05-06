@@ -388,8 +388,8 @@ scripts/
 | 1 — Core Pipeline | ✅ Complete | read → chunk → embed → store |
 | 2 — MCP Server | ✅ Complete | 7 MCP tools, stdio + HTTP transport |
 | 3A — Extended Files | ✅ Complete | DOCX, HTML, Python, Jupyter |
-| 3B — Agentic Retrieval | 🔄 In Progress | 20+ file types, `plan_query`, `search_multi`, `evaluate_chunks` |
-| 4 — Search Quality | ⏳ Planned | Cross-encoder reranker, metadata filter hardening |
+| 3B — Agentic Retrieval | ✅ Complete | 20+ file types, `plan_query`, `search_multi`, `evaluate_chunks` |
+| 4 — Search Quality | ✅ Complete | Cross-encoder reranker, metadata filter hardening |
 | 5 — Distribution | ✅ Complete | PyPI package (`aicompatible-rag`), `uvx` entry point |
 | 6 — Multi-Collection | ✅ Complete | Named collections, streaming retrieval |
 | 7 — Cloud Sync | ✅ Complete | Encrypted push/pull to S3-compatible backends |
