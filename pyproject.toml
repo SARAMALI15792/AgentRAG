@@ -74,7 +74,7 @@ sync = [
     "cryptography>=42.0,<43.0",
 ]
 all = [
-    "agentrag[office,ebooks,web,sync]",
+    "agentrag-mcp[office,ebooks,web,sync]",
 ]
 
 [project.scripts]
