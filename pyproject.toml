@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentrag"
+name = "agentrag-mcp"
 version = "0.1.0"
 description = "Agentic RAG MCP Server — persistent semantic memory over private data"
 license = { text = "MIT" }
@@ -79,6 +79,7 @@ all = [
 
 [project.scripts]
 agentrag = "agentrag.cli:app"
+agentrag-mcp = "agentrag.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentrag"]
