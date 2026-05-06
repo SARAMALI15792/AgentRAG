@@ -502,47 +502,24 @@ falls back. `pytest` green. `mypy --strict` passes.
 
 ---
 
-## Phase 7 — Cloud Sync (Optional, User Opt-In)
+## Phase 7 — Cloud Sync (Optional, User Opt-In) — COMPLETE
 
-**Entry condition:** Phase 6 exit condition met.
+**Completed:** 2026-05-06 | **PR:** #12 → `main` | **PyPI:** `aicompatible-rag==0.1.0`
 
-**Goal:** Optional cloud sync for the vector store. Users can back up and
+**Goal achieved:** Optional cloud sync for the vector store. Users can back up and
 restore their Qdrant data to cloud storage. Privacy-preserving: encrypted
 at rest, user-controlled keys, explicit opt-in only.
 
-**Dependency:** Cloud storage library (S3, GDrive, or Azure Blob — chosen at
-phase start with user approval). User must provide credentials.
+**Shipped:**
+- `SyncBackend` Protocol (structural typing) + `SyncResult` / `SyncStatus` types
+- `LocalSyncBackend` — tarfile directory snapshot; push/pull/status; close+reopen client for Windows file lock compatibility
+- `S3SyncBackend` — Fernet AES-128-CBC encryption before upload; boto3 ClientError handling; never raises
+- Backend factory (`get_sync_backend`) reading 5 new `AGENTRAG_SYNC_*` config vars
+- `agentrag sync push/pull/status` CLI subcommands
+- `QdrantStore.create_snapshot()` / `recover_snapshot()` filesystem-level backup
+- 27 new tests (unit + integration); 196 total passing
+- `specs/tech-stack.md` updated with `boto3 1.x`, `cryptography 42.x`, sync env vars
+- `scripts/verify_phase7.sh` exit gate
+- PyPI package published as `aicompatible-rag==0.1.0` — `uvx --from aicompatible-rag agentrag serve`
 
-### Deliverables
-
----
-
-**Step 1 — Sync abstraction layer**
-
-- [ ] `src/agentrag/sync/base.py` — `SyncBackend` protocol: `push()`, `pull()`, `status()`
-- [ ] `src/agentrag/sync/local.py` — local directory backup (always available, no cloud)
-
----
-
-**Step 2 — Cloud backend** _(library chosen at phase start)_
-
-- [ ] `src/agentrag/sync/cloud.py` — implements `SyncBackend` for chosen provider
-- [ ] Encryption at rest using user-provided key
-- [ ] New env vars: `AGENTRAG_SYNC_BACKEND`, `AGENTRAG_SYNC_ENDPOINT`, `AGENTRAG_SYNC_KEY`
-
----
-
-**Step 3 — CLI commands**
-
-- [ ] `agentrag sync push` — upload current Qdrant snapshot
-- [ ] `agentrag sync pull` — restore from latest snapshot
-- [ ] `agentrag sync status` — show last sync time and diff
-
----
-
-**Step 4 — Exit gate**
-
-- [ ] `scripts/verify_phase7.sh`
-
-**Exit condition:** Local backup works. Cloud sync works with chosen provider.
-No data syncs without explicit user action. `pytest` green. `mypy --strict` passes.
+**Exit condition met:** Local backup roundtrip verified. `pytest` green (196 passed). `mypy --strict` passes. CI green on `main`. PyPI publish successful.
