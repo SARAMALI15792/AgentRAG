@@ -116,3 +116,22 @@ class EvaluationReport:
     scored_chunks: list[ChunkScore]
     sufficient: bool  # True if any chunk scores >= 0.7
     suggested_queries: list[str]  # alternative queries when not sufficient
+
+
+@dataclass
+class SyncResult:
+    """Outcome of a sync push or pull operation."""
+
+    status: Literal["ok", "error"]
+    message: str
+    snapshot_id: str | None = None  # set on successful push
+
+
+@dataclass
+class SyncStatus:
+    """Current state of the sync backend."""
+
+    backend: str  # "local" or "s3"
+    last_push: str | None  # ISO 8601 or None
+    last_pull: str | None  # ISO 8601 or None
+    snapshot_count: int

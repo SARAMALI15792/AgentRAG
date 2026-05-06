@@ -30,6 +30,8 @@ dependencies = [
     "typer>=0.12.0",
     "PyYAML>=6.0,<7.0",
     "google-genai>=1.0",
+    "boto3>=1.0,<2.0",
+    "cryptography>=42.0,<43.0",
 ]
 
 [project.urls]
@@ -52,6 +54,7 @@ dev = [
     "types-beautifulsoup4",
     "types-PyYAML",
     "types-openpyxl",
+    "boto3-stubs[s3]>=1.0,<2.0",
 ]
 office = [
     "openpyxl>=3.1.0,<3.2.0",
@@ -66,8 +69,12 @@ web = [
     "pysrt>=1.1.0,<1.2.0",
     "webvtt-py>=0.5.0,<0.6.0",
 ]
+sync = [
+    "boto3>=1.0,<2.0",
+    "cryptography>=42.0,<43.0",
+]
 all = [
-    "agentrag[office,ebooks,web]",
+    "agentrag[office,ebooks,web,sync]",
 ]
 
 [project.scripts]
@@ -109,6 +116,10 @@ module = [
     "pptx",
     "pptx.*",
 ]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

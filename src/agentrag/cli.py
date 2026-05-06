@@ -12,8 +12,11 @@ from agentrag.config import Settings
 from agentrag.ingestion.pipeline import ingest
 from agentrag.server.app import create_app
 from agentrag.store.qdrant import QdrantStore
+from agentrag.sync.factory import get_sync_backend
 
 app = typer.Typer(help="AgentRAG — Agentic RAG MCP Server")
+sync_app = typer.Typer(help="Sync the vector store to/from a backup backend.")
+app.add_typer(sync_app, name="sync")
 
 # Configure logging once at module level
 logging.basicConfig(
@@ -75,6 +78,43 @@ def serve_cmd(
     else:
         typer.echo(f"[ERROR] Unknown transport: {transport}", err=True)
         raise typer.Exit(code=1)
+
+
+@sync_app.command(name="push")
+def sync_push_cmd() -> None:
+    """Create a snapshot and upload it to the configured sync backend."""
+    settings = Settings()
+    store = QdrantStore(settings)
+    backend = get_sync_backend(settings, store=store)
+    result = backend.push()
+    typer.echo(result.message)
+    if result.status == "error":
+        raise typer.Exit(code=1)
+
+
+@sync_app.command(name="pull")
+def sync_pull_cmd() -> None:
+    """Download the latest snapshot and restore the vector store."""
+    settings = Settings()
+    store = QdrantStore(settings)
+    backend = get_sync_backend(settings, store=store)
+    result = backend.pull()
+    typer.echo(result.message)
+    if result.status == "error":
+        raise typer.Exit(code=1)
+
+
+@sync_app.command(name="status")
+def sync_status_cmd() -> None:
+    """Show last push/pull times and snapshot count for the sync backend."""
+    settings = Settings()
+    store = QdrantStore(settings)
+    backend = get_sync_backend(settings, store=store)
+    s = backend.status()
+    typer.echo(f"Backend:        {s.backend}")
+    typer.echo(f"Snapshots:      {s.snapshot_count}")
+    typer.echo(f"Last push:      {s.last_push or 'never'}")
+    typer.echo(f"Last pull:      {s.last_pull or 'never'}")
 
 
 if __name__ == "__main__":

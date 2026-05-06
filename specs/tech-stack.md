@@ -65,7 +65,8 @@ plugin registry (Article IV.6).
 |---|---|---|---|---|
 | Cross-encoder re-ranking | `sentence-transformers` (CrossEncoder) | 3.x | 5 | `cross-encoder/ms-marco-MiniLM-L-6-v2`. Activated via `AGENTRAG_RERANK=true`. No new dependency — uses existing `sentence-transformers`. |
 | Streaming retrieval | `asyncio` (stdlib) | — | 7 | Async generator yielding `SearchResult` as scores arrive. No new dependency. |
-| Cloud sync | TBD (user approval required) | — | 8 | S3/GDrive sync for vector store. Library chosen at phase start. |
+| Cloud sync — S3 | `boto3` | 1.x | 7 | Amazon S3 (and S3-compatible) backend for snapshot upload/download. |
+| Snapshot encryption | `cryptography` (Fernet) | 42.x | 7 | AES-128-CBC + HMAC-SHA256. Snapshots encrypted before leaving the machine. |
 
 ---
 
@@ -102,6 +103,7 @@ Optional dependency groups (in `pyproject.toml`):
 | `office` | openpyxl, python-pptx | Office file support (Phase 3B) |
 | `ebooks` | ebooklib, mobi | eBook support (Phase 3B) |
 | `web` | httpx (runtime), pysrt, webvtt-py | URL ingestion and subtitle support (Phase 3C) |
+| `sync` | boto3, cryptography | Cloud sync to S3-compatible backends (Phase 7) |
 | `all` | All optional groups combined | Full feature set |
 
 ---
@@ -157,6 +159,11 @@ All configuration is loaded via `pydantic-settings` from environment or `.env`:
 | `AGENTRAG_COLLECTION` | `documents` | Qdrant collection name. Change to isolate different knowledge bases (Phase 7). |
 | `AGENTRAG_INGEST_TIMEOUT` | `300` | Max seconds per file ingestion before timeout. Prevents hanging on corrupt files. |
 | `AGENTRAG_MAX_FILE_SIZE_MB` | `100` | Max file size in MB for ingestion. Files exceeding this are rejected with actionable error. |
+| `AGENTRAG_SYNC_BACKEND` | `local` | `local` or `s3`. Selects active sync backend. |
+| `AGENTRAG_SYNC_ENDPOINT` | _(S3 bucket name)_ | For S3: bucket name. For S3-compatible: full endpoint URL. |
+| `AGENTRAG_SYNC_KEY` | _(required for push/pull)_ | Fernet encryption key (base64). Generate with `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'`. |
+| `AGENTRAG_SYNC_LOCAL_DIR` | `~/.agentrag/backups` | Directory for local backend snapshot archives. |
+| `AGENTRAG_SYNC_PREFIX` | `agentrag/` | S3 key prefix for all uploaded snapshots. |
 
 ---
 
