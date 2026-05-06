@@ -1,22 +1,48 @@
 # AgentRAG
 
-Agentic RAG MCP Server — persistent, semantically-indexed memory over private data for Claude and any MCP-compatible agent. Runs locally. No data leaves your machine.
+> Persistent, semantically-indexed memory over private data — for Claude and any MCP-compatible agent.
+> Runs fully local. No data leaves your machine.
 
 [![CI](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![PyPI](https://img.shields.io/pypi/v/aicompatible-rag)](https://pypi.org/project/aicompatible-rag/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![mypy: strict](https://img.shields.io/badge/mypy-strict-brightgreen)](https://mypy.readthedocs.io/)
+[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+---
+
+## What It Does
+
+AI models are powerful reasoners — but they are blind to your private data. Every session starts from zero.
+
+AgentRAG closes that gap. It is a locally-running MCP server that gives Claude a persistent, semantically-indexed memory over any documents you bring in. Claude calls `search_documents`, `plan_query`, and `evaluate_chunks` the same way it calls any other tool — and gets back the most relevant chunk from the right document, ranked by meaning rather than keyword match.
+
+**Key properties:**
+
+- **Fully local by default** — Qdrant vector store runs in-process, embeddings generated locally via `sentence-transformers`. No API keys required for core retrieval.
+- **Universal ingestion** — 20+ file types: PDF, DOCX, XLSX, EPUB, JSON, YAML, Markdown, Python, Jupyter notebooks, subtitles, emails, and web pages.
+- **Agentic retrieval** — Claude decomposes complex queries into sub-questions, searches multiple angles, scores relevance, and re-searches if needed — all through native MCP tool calls.
+- **Workspace isolation** — maintain separate knowledge bases per project via named Qdrant collections.
+- **Cloud sync (opt-in)** — encrypted snapshot push/pull to S3-compatible storage. Never syncs without explicit `agentrag sync push`.
+- **Privacy by design** — no telemetry, no analytics, no network calls unless you explicitly configure one.
 
 ---
 
 ## 60-Second Quickstart
 
 ```bash
-pip install agentrag
-export AGENTRAG_GOOGLE_API_KEY=your_key_here   # optional — enables agentic retrieval
+# Install
+pip install aicompatible-rag
+
+# (Optional) Enable agentic retrieval — free key from https://aistudio.google.com/
+export AGENTRAG_GOOGLE_API_KEY=your_key_here
+
+# Start the MCP server
 agentrag serve
 ```
 
-Claude Desktop picks it up immediately. No restart needed after adding the config below.
+Then add the config block below to Claude Desktop and start chatting over your documents.
 
 ---
 
@@ -24,9 +50,11 @@ Claude Desktop picks it up immediately. No restart needed after adding the confi
 
 Add to your Claude Desktop config file:
 
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+| Platform | Path |
+|----------|------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
 
 ### Option A — pip install (recommended)
 
@@ -48,7 +76,7 @@ Add to your Claude Desktop config file:
   "mcpServers": {
     "agentrag": {
       "command": "uvx",
-      "args": ["agentrag", "serve", "--data-dir", "~/.agentrag"]
+      "args": ["--from", "aicompatible-rag", "agentrag", "serve", "--data-dir", "~/.agentrag"]
     }
   }
 }
@@ -59,39 +87,79 @@ Add to your Claude Desktop config file:
 ## CLI Reference
 
 ```
-agentrag serve    Start the MCP server
-agentrag ingest   Ingest a file or directory into the vector store
-agentrag list     List all ingested sources
+agentrag serve      Start the MCP server
+agentrag ingest     Ingest a file or directory into the vector store
+agentrag list       List all ingested sources
+agentrag sync       Cloud sync subcommands (push / pull / status)
 ```
 
-### `agentrag serve` flags
+### `agentrag serve`
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--data-dir` | `~/.agentrag` | Root directory for Qdrant data |
 | `--transport` | `stdio` | `stdio` (Claude Desktop) or `http` |
-| `--port` | `8000` | HTTP port (ignored for stdio transport) |
-| `--embed-model` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model name |
+| `--port` | `8000` | HTTP port (ignored for stdio) |
+| `--embed-model` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model |
 | `--collection` | `documents` | Active Qdrant collection name |
 
-### Environment Variables
+### `agentrag ingest`
+
+```bash
+agentrag ingest /path/to/file.pdf
+agentrag ingest /path/to/directory --recursive
+```
+
+### `agentrag sync`
+
+```bash
+agentrag sync push      # snapshot current store and upload
+agentrag sync pull      # download latest snapshot and restore
+agentrag sync status    # show last push/pull timestamps
+```
+
+Requires `AGENTRAG_SYNC_BACKEND`, `AGENTRAG_SYNC_ENDPOINT`, and `AGENTRAG_SYNC_KEY`.
+See [Cloud Sync](#cloud-sync) for setup.
+
+---
+
+## Environment Variables
+
+All variables are loaded from environment or `.env` file via `pydantic-settings`.
+
+### Core
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENTRAG_DATA_DIR` | `~/.agentrag` | Root directory for Qdrant data and config |
-| `AGENTRAG_EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model name |
-| `AGENTRAG_VECTOR_DIM` | `384` | Output dimension of the embedding model |
-| `AGENTRAG_CHUNK_SIZE` | `512` | Token chunk size for splitting |
-| `AGENTRAG_CHUNK_OVERLAP` | `64` | Token overlap between chunks |
-| `AGENTRAG_PORT` | `8000` | HTTP port for HTTP transport |
+| `AGENTRAG_EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model name (full `{org}/{model}` HuggingFace path) |
+| `AGENTRAG_VECTOR_DIM` | `384` | Output dimension of the embedding model — must match the Qdrant collection |
+| `AGENTRAG_CHUNK_SIZE` | `512` | Token chunk size for sliding-window splitting |
+| `AGENTRAG_CHUNK_OVERLAP` | `64` | Token overlap between consecutive chunks |
+| `AGENTRAG_PORT` | `8000` | HTTP port for HTTP transport mode |
 | `AGENTRAG_TRANSPORT` | `stdio` | `stdio` or `http` |
-| `AGENTRAG_RERANK` | `false` | Set `true` to activate cross-encoder re-ranking |
-| `AGENTRAG_GOOGLE_API_KEY` | _(none)_ | Google Gemini API key — enables agentic retrieval |
-| `AGENTRAG_GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model for query planning and evaluation |
-| `AGENTRAG_QUERY_EXPAND` | `false` | Set `true` to enable Gemini-backed query expansion |
 | `AGENTRAG_COLLECTION` | `documents` | Active Qdrant collection name |
-| `AGENTRAG_INGEST_TIMEOUT` | `300` | Max seconds per file ingestion |
-| `AGENTRAG_MAX_FILE_SIZE_MB` | `100` | Max file size in MB (reject with actionable error above this) |
+| `AGENTRAG_INGEST_TIMEOUT` | `300` | Max seconds per file ingestion before timeout |
+| `AGENTRAG_MAX_FILE_SIZE_MB` | `100` | Max file size in MB — files above this are rejected with an actionable error |
+
+### Agentic Retrieval (Gemini)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENTRAG_GOOGLE_API_KEY` | _(none)_ | Google Gemini API key. Free key at [aistudio.google.com](https://aistudio.google.com/). Graceful degrade if missing. |
+| `AGENTRAG_GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model for query decomposition and chunk evaluation |
+| `AGENTRAG_QUERY_EXPAND` | `false` | Set `true` to enable Gemini-backed query expansion in `plan_query` |
+| `AGENTRAG_RERANK` | `false` | Set `true` to activate cross-encoder re-ranking (`ms-marco-MiniLM-L-6-v2`) |
+
+### Cloud Sync
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENTRAG_SYNC_BACKEND` | `local` | `local` or `s3` |
+| `AGENTRAG_SYNC_ENDPOINT` | _(none)_ | S3: bucket name. S3-compatible: full endpoint URL |
+| `AGENTRAG_SYNC_KEY` | _(none)_ | Fernet encryption key (base64). Generate: `python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'` |
+| `AGENTRAG_SYNC_LOCAL_DIR` | `~/.agentrag/backups` | Directory for local backend snapshot archives |
+| `AGENTRAG_SYNC_PREFIX` | `agentrag/` | S3 key prefix for all uploaded snapshots |
 
 ---
 
@@ -99,19 +167,66 @@ agentrag list     List all ingested sources
 
 All tools are available natively in Claude — no special prompting required.
 
-| Tool | Description |
-|------|-------------|
-| `ingest_file` | Ingest a single local file into the vector store |
-| `ingest_directory` | Bulk ingest all supported files in a directory |
-| `ingest_url` | Fetch a web page and ingest its text content |
-| `search_documents` | Semantic search over all ingested documents |
-| `search_by_metadata` | Filter sources by metadata without a semantic query |
-| `search_multi` | Search with multiple queries and deduplicate results |
-| `list_sources` | List all ingested sources with metadata summary |
-| `get_document` | Retrieve the full reconstructed text of a source |
-| `delete_source` | Remove a source and all its vector chunks |
-| `plan_query` | Decompose a complex query into focused sub-queries |
-| `evaluate_chunks` | Score each chunk's relevance to the original query |
+### Ingestion
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `ingest_file` | `path, metadata?` | Ingest a single local file into the vector store |
+| `ingest_directory` | `path, recursive?, file_types?, metadata?` | Bulk ingest all supported files in a directory |
+| `ingest_url` | `url, metadata?` | Fetch a web page and ingest its text content |
+
+### Retrieval
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `search_documents` | `query, top_k?, filters?` | Semantic search — returns chunks ranked by relevance |
+| `search_by_metadata` | `filters` | Filter sources by metadata without a semantic query |
+| `search_multi` | `queries, top_k?` | Search with multiple queries; deduplicates by `chunk_id` |
+| `search_stream` | `query, top_k?` | Streaming search — results arrive as they score |
+
+### Agentic Loop
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `plan_query` | `query` | Decompose a complex query into focused sub-queries (Gemini-backed) |
+| `evaluate_chunks` | `query, results` | Score each chunk's relevance; returns `EvaluationReport` with re-search suggestions |
+
+### Document Management
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `list_sources` | _(none)_ | List all ingested sources with metadata summary |
+| `get_document` | `source_id` | Retrieve the full reconstructed text of a source |
+| `delete_source` | `source_id` | Remove a source and all its vector chunks |
+
+### Workspace (Collections)
+
+| Tool | Input | Description |
+|------|-------|-------------|
+| `list_collections` | _(none)_ | List all named Qdrant collections |
+| `create_collection` | `name` | Create a new named collection for workspace isolation |
+| `switch_collection` | `name` | Set active collection for subsequent operations |
+
+---
+
+## Agentic Retrieval Loop
+
+When `AGENTRAG_GOOGLE_API_KEY` is set, Claude can run a full agentic retrieval loop:
+
+```
+plan_query("compare treatment A and treatment B for condition X")
+  → QueryPlan(sub_queries=["what is treatment A?", "what is treatment B?", "comparison studies"])
+
+search_multi(sub_queries, top_k=5)
+  → deduplicated SearchResult list
+
+evaluate_chunks(original_query, results)
+  → EvaluationReport(sufficient=False, suggested_queries=["side effects comparison", ...])
+
+search_multi(suggested_queries)  ← re-search if not sufficient
+```
+
+All three tools degrade gracefully when the API is unavailable — retrieval is never blocked.
 
 ---
 
@@ -128,18 +243,99 @@ All tools are available natively in Claude — no special prompting required.
 | `.json`, `.yaml`, `.xml`, `.toml` | Structured data | _(included)_ |
 | `.csv` | Tabular | _(included)_ |
 | `.eml`, `.mbox` | Email | _(included)_ |
-| `.xlsx` | Spreadsheet | `pip install agentrag[office]` |
-| `.pptx` | Presentation | `pip install agentrag[office]` |
-| `.epub` | eBook | `pip install agentrag[ebooks]` |
-| `.mobi` | eBook | `pip install agentrag[ebooks]` |
-| `.srt`, `.vtt` | Subtitles | `pip install agentrag[web]` |
-| URL | Web page | `pip install agentrag[web]` |
+| `.xlsx` | Spreadsheet | `pip install aicompatible-rag[office]` |
+| `.pptx` | Presentation | `pip install aicompatible-rag[office]` |
+| `.epub` | eBook | `pip install aicompatible-rag[ebooks]` |
+| `.mobi` | eBook | `pip install aicompatible-rag[ebooks]` |
+| `.srt`, `.vtt` | Subtitles | `pip install aicompatible-rag[web]` |
+| URL | Web page | `pip install aicompatible-rag[web]` |
 
 Install all optional types at once:
 
 ```bash
-pip install agentrag[all]
+pip install aicompatible-rag[all]
 ```
+
+---
+
+## Cloud Sync
+
+AgentRAG can back up and restore your Qdrant vector store to any S3-compatible storage. All snapshots are encrypted client-side before upload — your encryption key never leaves your machine.
+
+### Local backup (no cloud required)
+
+```bash
+# .env
+AGENTRAG_SYNC_BACKEND=local
+AGENTRAG_SYNC_LOCAL_DIR=~/agentrag-backups
+AGENTRAG_SYNC_KEY=<your-fernet-key>
+```
+
+### S3 sync
+
+```bash
+# .env
+AGENTRAG_SYNC_BACKEND=s3
+AGENTRAG_SYNC_ENDPOINT=my-bucket-name
+AGENTRAG_SYNC_KEY=<your-fernet-key>
+```
+
+Generate a key:
+```bash
+python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+```
+
+Then push and pull:
+```bash
+agentrag sync push    # snapshot + encrypt + upload
+agentrag sync pull    # download + decrypt + restore
+agentrag sync status  # timestamps of last push/pull
+```
+
+> **Privacy guarantee:** Snapshots are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) before upload. The server never sees plaintext data.
+
+---
+
+## Workspace Isolation
+
+Maintain separate knowledge bases per project using named Qdrant collections.
+
+```bash
+# via env var
+AGENTRAG_COLLECTION=project-alpha agentrag serve
+
+# via MCP tool (from Claude)
+create_collection("project-alpha")
+switch_collection("project-alpha")
+ingest_file("/path/to/docs")
+search_documents("query")   # scoped to project-alpha only
+```
+
+Data in one collection is never visible from another.
+
+---
+
+## Architecture
+
+```
+Ingestion path:
+  File / URL
+    → reader_registry (dispatches to format reader)
+    → reader.py          RawDocument
+    → chunker.py         List[Chunk]  (512 tokens / 64 overlap)
+    → embedder.py        List[EmbeddedChunk]  (local sentence-transformers)
+    → store/qdrant.py    upsert  (embedded Qdrant, persisted to ~/.agentrag)
+
+Retrieval path:
+  Claude → search_documents
+    → searcher.py        embed query + qdrant.query + rerank
+    → List[SearchResult]
+
+Agentic path:
+  Claude → plan_query → search_multi → evaluate_chunks → (re-search if needed)
+```
+
+**Dependency direction is strict** — `store/` never imports from `ingestion/` or `retrieval/`. `ingestion/` never imports from `retrieval/`. Reader modules in `ingestion/readers/` are pure leaf functions: `(Path) -> str`.
 
 ---
 
@@ -152,4 +348,64 @@ uv pip install -e ".[dev,office,ebooks,web]"
 uv run pytest --tb=short
 ```
 
-A pre-commit hook runs `black`, `ruff`, and `mypy` automatically on every commit.
+### Toolchain
+
+| Tool | Command |
+|------|---------|
+| Format | `uv run black .` |
+| Lint | `uv run ruff check .` |
+| Type check | `uv run mypy --strict src/` |
+| Test | `uv run pytest --tb=short` |
+| All checks | `uv run black . && uv run ruff check . && uv run mypy --strict src/` |
+
+A pre-commit hook runs all three checks automatically before every commit.
+
+### Project Layout
+
+```
+src/agentrag/
+  cli.py              CLI entry point (typer)
+  config.py           All runtime configuration (pydantic-settings)
+  types.py            Domain dataclasses — single source of truth
+  ingestion/          reader → chunker → embedder → pipeline
+  retrieval/          searcher, reranker, query_planner, evaluator, streaming
+  store/              qdrant.py — sole importer of qdrant_client
+  sync/               cloud sync backends (local + S3)
+  server/             MCP server, tool handlers
+tests/
+  unit/               isolated, all external deps mocked
+  integration/        real Qdrant embedded, real files
+scripts/
+  verify_phase*.sh    deterministic phase exit gates
+```
+
+---
+
+## Roadmap
+
+| Phase | Status | Deliverable |
+|-------|--------|-------------|
+| 1 — Core Pipeline | ✅ Complete | read → chunk → embed → store |
+| 2 — MCP Server | ✅ Complete | 7 MCP tools, stdio + HTTP transport |
+| 3A — Extended Files | ✅ Complete | DOCX, HTML, Python, Jupyter |
+| 3B — Agentic Retrieval | 🔄 In Progress | 20+ file types, `plan_query`, `search_multi`, `evaluate_chunks` |
+| 4 — Search Quality | ⏳ Planned | Cross-encoder reranker, metadata filter hardening |
+| 5 — Distribution | ✅ Complete | PyPI package (`aicompatible-rag`), `uvx` entry point |
+| 6 — Multi-Collection | ✅ Complete | Named collections, streaming retrieval |
+| 7 — Cloud Sync | ✅ Complete | Encrypted push/pull to S3-compatible backends |
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Contributing
+
+This project follows an AI-First development model. All source code is written by Claude under the [project constitution](CLAUDE.md). Issues, feedback, and direction are always welcome.
+
+- **Bugs:** [open an issue](https://github.com/SARAMALI15792/AgentRAG/issues)
+- **Questions:** open a discussion
+- **Code changes:** describe the problem, not the fix — Claude writes the implementation
