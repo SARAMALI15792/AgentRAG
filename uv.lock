@@ -9,116 +9,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agentrag-mcp"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "boto3" },
-    { name = "cryptography" },
-    { name = "fastapi" },
-    { name = "google-genai" },
-    { name = "mcp" },
-    { name = "pydantic-settings" },
-    { name = "pymupdf" },
-    { name = "python-docx" },
-    { name = "pyyaml" },
-    { name = "qdrant-client" },
-    { name = "sentence-transformers" },
-    { name = "typer" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "boto3" },
-    { name = "cryptography" },
-    { name = "ebooklib" },
-    { name = "httpx" },
-    { name = "mobi" },
-    { name = "openpyxl" },
-    { name = "pysrt" },
-    { name = "python-pptx" },
-    { name = "webvtt-py" },
-]
-dev = [
-    { name = "black" },
-    { name = "boto3-stubs", extra = ["s3"] },
-    { name = "build" },
-    { name = "hatchling" },
-    { name = "httpx" },
-    { name = "mypy" },
-    { name = "numpy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-beautifulsoup4" },
-    { name = "types-openpyxl" },
-    { name = "types-pyyaml" },
-]
-ebooks = [
-    { name = "ebooklib" },
-    { name = "mobi" },
-]
-office = [
-    { name = "openpyxl" },
-    { name = "python-pptx" },
-]
-sync = [
-    { name = "boto3" },
-    { name = "cryptography" },
-]
-web = [
-    { name = "httpx" },
-    { name = "pysrt" },
-    { name = "webvtt-py" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agentrag-mcp", extras = ["office", "ebooks", "web", "sync"], marker = "extra == 'all'" },
-    { name = "beautifulsoup4", specifier = ">=4.12.0,<4.13.0" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=25.0,<26.0" },
-    { name = "boto3", specifier = ">=1.0,<2.0" },
-    { name = "boto3", marker = "extra == 'sync'", specifier = ">=1.0,<2.0" },
-    { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.0,<2.0" },
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2" },
-    { name = "cryptography", specifier = ">=42.0,<43.0" },
-    { name = "cryptography", marker = "extra == 'sync'", specifier = ">=42.0,<43.0" },
-    { name = "ebooklib", marker = "extra == 'ebooks'", specifier = ">=0.18,<0.19" },
-    { name = "fastapi", specifier = ">=0.136.0,<0.137.0" },
-    { name = "google-genai", specifier = ">=1.0" },
-    { name = "hatchling", marker = "extra == 'dev'" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
-    { name = "httpx", marker = "extra == 'web'", specifier = ">=0.27.0" },
-    { name = "mcp", specifier = "==1.27.0" },
-    { name = "mobi", marker = "extra == 'ebooks'", specifier = ">=0.3.0,<0.4.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
-    { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.26" },
-    { name = "openpyxl", marker = "extra == 'office'", specifier = ">=3.1.0,<3.2.0" },
-    { name = "pydantic-settings", specifier = ">=2.0,<3.0" },
-    { name = "pymupdf", specifier = ">=1.24.0" },
-    { name = "pysrt", marker = "extra == 'web'", specifier = ">=1.1.0,<1.2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0,<2.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
-    { name = "python-docx", specifier = ">=1.1.0,<1.2.0" },
-    { name = "python-pptx", marker = "extra == 'office'", specifier = ">=1.0.0,<2.0.0" },
-    { name = "pyyaml", specifier = ">=6.0,<7.0" },
-    { name = "qdrant-client", specifier = ">=1.17.0,<1.18.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0,<0.16.0" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
-    { name = "typer", specifier = ">=0.12.0" },
-    { name = "types-beautifulsoup4", marker = "extra == 'dev'" },
-    { name = "types-openpyxl", marker = "extra == 'dev'" },
-    { name = "types-pyyaml", marker = "extra == 'dev'" },
-    { name = "uvicorn", specifier = ">=0.46.0,<0.47.0" },
-    { name = "webvtt-py", marker = "extra == 'web'", specifier = ">=0.5.0,<0.6.0" },
-]
-provides-extras = ["dev", "office", "ebooks", "web", "sync", "all"]
-
-[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2122,6 +2012,116 @@ sdist = { url = "https://files.pythonhosted.org/packages/30/dd/f8a8261b83946af3c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/68/69/77d1a971c4b933e8c79403e99bcbb790463da5e48333cc4fd5d412c63c98/qdrant_client-1.17.1-py3-none-any.whl", hash = "sha256:6cda4064adfeaf211c751f3fbc00edbbdb499850918c7aff4855a9a759d56cbd", size = 389947, upload-time = "2026-03-13T17:13:43.156Z" },
 ]
+
+[[package]]
+name = "rag-mcp-server"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "boto3" },
+    { name = "cryptography" },
+    { name = "fastapi" },
+    { name = "google-genai" },
+    { name = "mcp" },
+    { name = "pydantic-settings" },
+    { name = "pymupdf" },
+    { name = "python-docx" },
+    { name = "pyyaml" },
+    { name = "qdrant-client" },
+    { name = "sentence-transformers" },
+    { name = "typer" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "boto3" },
+    { name = "cryptography" },
+    { name = "ebooklib" },
+    { name = "httpx" },
+    { name = "mobi" },
+    { name = "openpyxl" },
+    { name = "pysrt" },
+    { name = "python-pptx" },
+    { name = "webvtt-py" },
+]
+dev = [
+    { name = "black" },
+    { name = "boto3-stubs", extra = ["s3"] },
+    { name = "build" },
+    { name = "hatchling" },
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "numpy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "types-beautifulsoup4" },
+    { name = "types-openpyxl" },
+    { name = "types-pyyaml" },
+]
+ebooks = [
+    { name = "ebooklib" },
+    { name = "mobi" },
+]
+office = [
+    { name = "openpyxl" },
+    { name = "python-pptx" },
+]
+sync = [
+    { name = "boto3" },
+    { name = "cryptography" },
+]
+web = [
+    { name = "httpx" },
+    { name = "pysrt" },
+    { name = "webvtt-py" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0,<4.13.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=25.0,<26.0" },
+    { name = "boto3", specifier = ">=1.0,<2.0" },
+    { name = "boto3", marker = "extra == 'sync'", specifier = ">=1.0,<2.0" },
+    { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.0,<2.0" },
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2" },
+    { name = "cryptography", specifier = ">=42.0,<43.0" },
+    { name = "cryptography", marker = "extra == 'sync'", specifier = ">=42.0,<43.0" },
+    { name = "ebooklib", marker = "extra == 'ebooks'", specifier = ">=0.18,<0.19" },
+    { name = "fastapi", specifier = ">=0.136.0,<0.137.0" },
+    { name = "google-genai", specifier = ">=1.0" },
+    { name = "hatchling", marker = "extra == 'dev'" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "httpx", marker = "extra == 'web'", specifier = ">=0.27.0" },
+    { name = "mcp", specifier = "==1.27.0" },
+    { name = "mobi", marker = "extra == 'ebooks'", specifier = ">=0.3.0,<0.4.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
+    { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.26" },
+    { name = "openpyxl", marker = "extra == 'office'", specifier = ">=3.1.0,<3.2.0" },
+    { name = "pydantic-settings", specifier = ">=2.0,<3.0" },
+    { name = "pymupdf", specifier = ">=1.24.0" },
+    { name = "pysrt", marker = "extra == 'web'", specifier = ">=1.1.0,<1.2.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.3.0,<2.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
+    { name = "python-docx", specifier = ">=1.1.0,<1.2.0" },
+    { name = "python-pptx", marker = "extra == 'office'", specifier = ">=1.0.0,<2.0.0" },
+    { name = "pyyaml", specifier = ">=6.0,<7.0" },
+    { name = "qdrant-client", specifier = ">=1.17.0,<1.18.0" },
+    { name = "rag-mcp-server", extras = ["office", "ebooks", "web", "sync"], marker = "extra == 'all'" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0,<0.16.0" },
+    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "typer", specifier = ">=0.12.0" },
+    { name = "types-beautifulsoup4", marker = "extra == 'dev'" },
+    { name = "types-openpyxl", marker = "extra == 'dev'" },
+    { name = "types-pyyaml", marker = "extra == 'dev'" },
+    { name = "uvicorn", specifier = ">=0.46.0,<0.47.0" },
+    { name = "webvtt-py", marker = "extra == 'web'", specifier = ">=0.5.0,<0.6.0" },
+]
+provides-extras = ["dev", "office", "ebooks", "web", "sync", "all"]
 
 [[package]]
 name = "referencing"
