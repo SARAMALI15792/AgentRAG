@@ -1,14 +1,17 @@
-# AgentRAG
+<div align="center">
 
-> Persistent, semantically-indexed memory over private data — for Claude and any MCP-compatible agent.
-> Runs fully local. No data leaves your machine.
+![AgentRAG Banner](docs/banner.svg)
 
-[![CI](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/badge/pypi-v0.1.0-blue)](https://pypi.org/project/aicompatible-rag/)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![mypy: strict](https://img.shields.io/badge/mypy-strict-brightgreen)](https://mypy.readthedocs.io/)
-[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+<br/>
+
+[![CI](https://img.shields.io/github/actions/workflow/status/SARAMALI15792/AgentRAG/ci.yml?branch=main&style=for-the-badge&logo=github&label=CI)](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/badge/PyPI-v0.1.0-3775A9?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/aicompatible-rag/)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
+[![mypy](https://img.shields.io/badge/mypy-strict-2A6DB2?style=for-the-badge)](https://mypy.readthedocs.io/)
+[![Black](https://img.shields.io/badge/code%20style-black-000000?style=for-the-badge)](https://github.com/psf/black)
+
+</div>
 
 ---
 

@@ -1,0 +1,158 @@
+<svg width="1280" height="400" viewBox="0 0 1280 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="50%" stop-color="#bc8cff"/>
+      <stop offset="100%" stop-color="#f0883e"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#bc8cff"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#21262d"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="400" fill="url(#bgGrad)"/>
+  <rect width="1280" height="400" fill="url(#dots)" opacity="0.55"/>
+
+  <!-- Top accent bar -->
+  <rect x="0" y="0" width="1280" height="4" fill="url(#accentGrad)"/>
+
+  <!-- Ambient glow blobs (right panel) -->
+  <circle cx="1020" cy="195" r="200" fill="#1f6feb" opacity="0.04"/>
+  <circle cx="1160" cy="130" r="130" fill="#6e40c9" opacity="0.05"/>
+  <circle cx="900" cy="300" r="100" fill="#238636" opacity="0.04"/>
+
+  <!-- Vertical divider -->
+  <line x1="680" y1="32" x2="680" y2="368" stroke="#21262d" stroke-width="1" opacity="0.8"/>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--          RIGHT: pipeline graph         -->
+  <!-- ══════════════════════════════════════ -->
+
+  <!-- Layer labels (bottom) -->
+  <text x="770" y="378" text-anchor="middle" font-family="ui-monospace,'Segoe UI Mono',monospace" font-size="10" fill="#484f58" letter-spacing="1">INGEST</text>
+  <text x="910" y="378" text-anchor="middle" font-family="ui-monospace,'Segoe UI Mono',monospace" font-size="10" fill="#484f58" letter-spacing="1">EMBED</text>
+  <text x="1055" y="378" text-anchor="middle" font-family="ui-monospace,'Segoe UI Mono',monospace" font-size="10" fill="#484f58" letter-spacing="1">STORE</text>
+  <text x="1185" y="378" text-anchor="middle" font-family="ui-monospace,'Segoe UI Mono',monospace" font-size="10" fill="#484f58" letter-spacing="1">CLAUDE</text>
+
+  <!-- Connections L1→L2 -->
+  <line x1="770" y1="90"  x2="910" y2="75"  stroke="#21262d" stroke-width="1.4"/>
+  <line x1="770" y1="90"  x2="910" y2="168" stroke="#21262d" stroke-width="1.4" opacity="0.6"/>
+  <line x1="770" y1="195" x2="910" y2="75"  stroke="#21262d" stroke-width="1.4" opacity="0.5"/>
+  <line x1="770" y1="195" x2="910" y2="168" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="770" y1="195" x2="910" y2="258" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="770" y1="300" x2="910" y2="168" stroke="#21262d" stroke-width="1.4" opacity="0.5"/>
+  <line x1="770" y1="300" x2="910" y2="258" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="770" y1="300" x2="910" y2="342" stroke="#21262d" stroke-width="1.4"/>
+
+  <!-- Connections L2→L3 -->
+  <line x1="910" y1="75"  x2="1055" y2="108" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="910" y1="75"  x2="1055" y2="218" stroke="#21262d" stroke-width="1.4" opacity="0.4"/>
+  <line x1="910" y1="168" x2="1055" y2="108" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="910" y1="168" x2="1055" y2="218" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="910" y1="258" x2="1055" y2="218" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="910" y1="258" x2="1055" y2="318" stroke="#21262d" stroke-width="1.4"/>
+  <line x1="910" y1="342" x2="1055" y2="218" stroke="#21262d" stroke-width="1.4" opacity="0.5"/>
+  <line x1="910" y1="342" x2="1055" y2="318" stroke="#21262d" stroke-width="1.4"/>
+
+  <!-- Connections L3→Output (colored — final retrieval) -->
+  <line x1="1055" y1="108" x2="1185" y2="158" stroke="#58a6ff" stroke-width="1.6" opacity="0.55"/>
+  <line x1="1055" y1="218" x2="1185" y2="158" stroke="#58a6ff" stroke-width="1.6" opacity="0.45"/>
+  <line x1="1055" y1="218" x2="1185" y2="258" stroke="#bc8cff" stroke-width="1.6" opacity="0.45"/>
+  <line x1="1055" y1="318" x2="1185" y2="258" stroke="#bc8cff" stroke-width="1.6" opacity="0.55"/>
+
+  <!-- Layer 1 nodes — green (documents) -->
+  <circle cx="770" cy="90"  r="10" fill="#0d4a1a" filter="url(#glow)"/>
+  <circle cx="770" cy="90"  r="6"  fill="#3fb950"/>
+  <circle cx="770" cy="195" r="10" fill="#0d4a1a" filter="url(#glow)"/>
+  <circle cx="770" cy="195" r="6"  fill="#3fb950"/>
+  <circle cx="770" cy="300" r="10" fill="#0d4a1a" filter="url(#glow)"/>
+  <circle cx="770" cy="300" r="6"  fill="#3fb950"/>
+
+  <!-- Layer 2 nodes — blue (embedder) -->
+  <circle cx="910" cy="75"  r="10" fill="#0d2a5e" filter="url(#glow)"/>
+  <circle cx="910" cy="75"  r="6"  fill="#58a6ff"/>
+  <circle cx="910" cy="168" r="12" fill="#0d2a5e" filter="url(#glow)"/>
+  <circle cx="910" cy="168" r="7"  fill="#58a6ff"/>
+  <circle cx="910" cy="258" r="10" fill="#0d2a5e" filter="url(#glow)"/>
+  <circle cx="910" cy="258" r="6"  fill="#58a6ff"/>
+  <circle cx="910" cy="342" r="8"  fill="#0d2a5e" filter="url(#glow)" opacity="0.8"/>
+  <circle cx="910" cy="342" r="5"  fill="#58a6ff" opacity="0.8"/>
+
+  <!-- Layer 3 nodes — purple (vector store) -->
+  <circle cx="1055" cy="108" r="10" fill="#2d1a5e" filter="url(#glow)"/>
+  <circle cx="1055" cy="108" r="6"  fill="#bc8cff"/>
+  <circle cx="1055" cy="218" r="12" fill="#2d1a5e" filter="url(#glow)"/>
+  <circle cx="1055" cy="218" r="7"  fill="#bc8cff"/>
+  <circle cx="1055" cy="318" r="10" fill="#2d1a5e" filter="url(#glow)"/>
+  <circle cx="1055" cy="318" r="6"  fill="#bc8cff"/>
+
+  <!-- Output nodes — orange (Claude / retrieval) -->
+  <circle cx="1185" cy="158" r="16" fill="#5a2e00" filter="url(#bigGlow)"/>
+  <circle cx="1185" cy="158" r="9"  fill="#f0883e"/>
+  <circle cx="1185" cy="258" r="16" fill="#5a2e00" filter="url(#bigGlow)"/>
+  <circle cx="1185" cy="258" r="9"  fill="#f0883e"/>
+
+  <!-- ══════════════════════════════════════ -->
+  <!--           LEFT: text content           -->
+  <!-- ══════════════════════════════════════ -->
+
+  <!-- "MCP SERVER" eyebrow pill -->
+  <rect x="80" y="72" width="148" height="26" rx="13" fill="#1f6feb" opacity="0.18"/>
+  <rect x="80" y="72" width="148" height="26" rx="13" fill="none" stroke="#1f6feb" stroke-width="1" opacity="0.4"/>
+  <text x="154" y="90" text-anchor="middle" font-family="ui-monospace,'Segoe UI Mono',monospace" font-size="11" fill="#58a6ff" font-weight="600" letter-spacing="2">MCP SERVER</text>
+
+  <!-- Main title -->
+  <text x="80" y="182" font-family="'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif" font-size="80" font-weight="800" fill="url(#titleGrad)" letter-spacing="-3">AgentRAG</text>
+
+  <!-- Subtitle -->
+  <text x="83" y="220" font-family="'Segoe UI',system-ui,sans-serif" font-size="19" fill="#8b949e" letter-spacing="0.3">Agentic RAG · Persistent Memory · Fully Local</text>
+
+  <!-- Description -->
+  <text x="83" y="256" font-family="'Segoe UI',system-ui,sans-serif" font-size="14" fill="#6e7681">Semantic memory over private data for Claude. No cloud. No vendor lock-in.</text>
+
+  <!-- Feature pills row -->
+  <!-- Pill: Local-first -->
+  <rect x="83" y="288" width="118" height="28" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <circle cx="104" cy="302" r="4" fill="#3fb950"/>
+  <text x="116" y="307" font-family="'Segoe UI',system-ui,sans-serif" font-size="12" fill="#8b949e">Local-first</text>
+
+  <!-- Pill: 20+ file types -->
+  <rect x="213" y="288" width="136" height="28" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <circle cx="232" cy="302" r="4" fill="#58a6ff"/>
+  <text x="244" y="307" font-family="'Segoe UI',system-ui,sans-serif" font-size="12" fill="#8b949e">20+ file types</text>
+
+  <!-- Pill: Agentic loop -->
+  <rect x="361" y="288" width="122" height="28" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <circle cx="380" cy="302" r="4" fill="#bc8cff"/>
+  <text x="392" y="307" font-family="'Segoe UI',system-ui,sans-serif" font-size="12" fill="#8b949e">Agentic loop</text>
+
+  <!-- Pill: Python 3.12+ -->
+  <rect x="495" y="288" width="126" height="28" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <circle cx="514" cy="302" r="4" fill="#f0883e"/>
+  <text x="526" y="307" font-family="'Segoe UI',system-ui,sans-serif" font-size="12" fill="#8b949e">Python 3.12+</text>
+
+  <!-- Pill: MIT -->
+  <rect x="633" y="288" width="90" height="28" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <circle cx="651" cy="302" r="4" fill="#f0883e" opacity="0.6"/>
+  <text x="663" y="307" font-family="'Segoe UI',system-ui,sans-serif" font-size="12" fill="#8b949e">MIT License</text>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="396" width="1280" height="4" fill="url(#accentGrad)" opacity="0.35"/>
+</svg>
