@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import tarfile
 import threading
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from qdrant_client import QdrantClient
@@ -216,6 +219,58 @@ class QdrantStore:
         results.sort(key=lambda r: r.chunk_id)
         full_text = "".join(r.text for r in results)
         return results[0].filename, full_text, source_id, results[0].metadata
+
+    def create_snapshot(self, dest_dir: Path) -> Path:
+        """Close client, archive Qdrant data directory, reopen client."""
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        qdrant_path_str = str((self._settings.data_dir / "qdrant").resolve())
+        qdrant_dir = Path(qdrant_path_str)
+        # Close client to release file locks before archiving (required on Windows)
+        with _cache_lock:
+            client = _client_cache.pop(qdrant_path_str, None)
+            _upsert_locks.pop(qdrant_path_str, None)
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+        try:
+            ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            snapshot_path = dest_dir / f"snapshot_{ts}.snapshot"
+            with tarfile.open(snapshot_path, "w:gz") as tf:
+                tf.add(str(qdrant_dir), arcname="qdrant")
+        finally:
+            # Always reopen so the store remains usable
+            with _cache_lock:
+                new_client = QdrantClient(path=qdrant_path_str)
+                _client_cache[qdrant_path_str] = new_client
+                _upsert_locks[qdrant_path_str] = threading.Lock()
+            self._client = new_client
+            self._upsert_lock = _upsert_locks[qdrant_path_str]
+        return snapshot_path
+
+    def recover_snapshot(self, snapshot_path: Path) -> None:
+        """Close client, replace data directory from snapshot, reopen."""
+        qdrant_path_str = str((self._settings.data_dir / "qdrant").resolve())
+        qdrant_dir = Path(qdrant_path_str)
+        with _cache_lock:
+            client = _client_cache.pop(qdrant_path_str, None)
+            _upsert_locks.pop(qdrant_path_str, None)
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+        if qdrant_dir.exists():
+            shutil.rmtree(qdrant_dir)
+        with tarfile.open(snapshot_path, "r:gz") as tf:
+            tf.extractall(str(self._settings.data_dir), filter="data")
+        with _cache_lock:
+            new_client = QdrantClient(path=qdrant_path_str)
+            _client_cache[qdrant_path_str] = new_client
+            _upsert_locks[qdrant_path_str] = threading.Lock()
+        self._client = new_client
+        self._upsert_lock = _upsert_locks[qdrant_path_str]
 
     def _delete_by_source(self, source_id: str) -> None:
         """Remove all Qdrant points whose payload source_id matches."""

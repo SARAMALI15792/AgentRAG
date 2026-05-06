@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     ingest_timeout: int = 300
     max_file_size_mb: int = 100
 
+    # Phase 7 — cloud sync
+    sync_backend: str = "local"  # "local" or "s3"
+    sync_endpoint: str = ""  # S3 bucket name or S3-compatible endpoint URL
+    sync_key: str = ""  # Fernet encryption key (base64)
+    sync_local_dir: Path = Path.home() / ".agentrag" / "backups"
+    sync_prefix: str = "agentrag/"  # S3 key prefix for uploaded snapshots
+
     def model_post_init(self, __context: Any) -> None:
         """Create data_dir on disk if it does not already exist."""
         self.data_dir.mkdir(parents=True, exist_ok=True)
