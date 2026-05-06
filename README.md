@@ -46,7 +46,13 @@ Then add the config block below to Claude Desktop and start chatting over your d
 
 ---
 
-## Claude Desktop Integration
+## Integrations
+
+AgentRAG works with any MCP-compatible client. Pick the integration that matches your workflow.
+
+---
+
+### Claude Desktop
 
 Add to your Claude Desktop config file:
 
@@ -56,7 +62,7 @@ Add to your Claude Desktop config file:
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
-### Option A — pip install (recommended)
+**Option A — pip install (recommended)**
 
 ```json
 {
@@ -69,7 +75,7 @@ Add to your Claude Desktop config file:
 }
 ```
 
-### Option B — zero-install via uvx (no pip required)
+**Option B — zero-install via uvx (no pip required)**
 
 ```json
 {
@@ -81,6 +87,88 @@ Add to your Claude Desktop config file:
   }
 }
 ```
+
+---
+
+### Claude Code (CLI)
+
+[Claude Code](https://claude.ai/code) supports MCP servers via project-level or global config.
+
+**Add to project** (`.claude/mcp_servers.json` in your repo):
+
+```json
+{
+  "agentrag": {
+    "command": "agentrag",
+    "args": ["serve", "--data-dir", "~/.agentrag"],
+    "env": {
+      "AGENTRAG_GOOGLE_API_KEY": "your_key_here"
+    }
+  }
+}
+```
+
+Or register globally via the Claude Code CLI:
+
+```bash
+claude mcp add agentrag agentrag serve --data-dir ~/.agentrag
+```
+
+Once registered, Claude Code can call all AgentRAG tools (`ingest_file`, `search_documents`, etc.) directly from any coding session — giving it semantic memory over your private docs, codebases, and notes.
+
+---
+
+### VS Code (GitHub Copilot / MCP extension)
+
+Any VS Code extension that supports MCP servers (e.g. GitHub Copilot with MCP, or the official MCP extension) can connect to AgentRAG over HTTP transport.
+
+**Step 1 — start AgentRAG in HTTP mode:**
+
+```bash
+AGENTRAG_TRANSPORT=http AGENTRAG_PORT=8000 agentrag serve
+```
+
+**Step 2 — add to VS Code `settings.json`:**
+
+```json
+{
+  "mcp.servers": {
+    "agentrag": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+---
+
+### JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.)
+
+JetBrains AI Assistant supports MCP servers via HTTP transport.
+
+**Step 1 — start AgentRAG in HTTP mode:**
+
+```bash
+AGENTRAG_TRANSPORT=http AGENTRAG_PORT=8000 agentrag serve
+```
+
+**Step 2 — add in** `Settings → Tools → AI Assistant → MCP Servers`:
+
+```
+Name:    agentrag
+URL:     http://localhost:8000/mcp
+```
+
+---
+
+### Any MCP-compatible client
+
+AgentRAG speaks the [Model Context Protocol](https://modelcontextprotocol.io/) over both `stdio` and HTTP. Any client that supports MCP can connect:
+
+| Transport | Use case | How to start |
+|-----------|----------|--------------|
+| `stdio` | Claude Desktop, Claude Code, local tools | `agentrag serve` (default) |
+| `http` | VS Code, JetBrains, remote agents, custom clients | `AGENTRAG_TRANSPORT=http agentrag serve` |
 
 ---
 
@@ -399,13 +487,3 @@ scripts/
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-## Contributing
-
-This project follows an AI-First development model. All source code is written by Claude under the [project constitution](CLAUDE.md). Issues, feedback, and direction are always welcome.
-
-- **Bugs:** [open an issue](https://github.com/SARAMALI15792/AgentRAG/issues)
-- **Questions:** open a discussion
-- **Code changes:** describe the problem, not the fix — Claude writes the implementation
