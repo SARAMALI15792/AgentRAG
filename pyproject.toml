@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "rag-mcp-server"
+name = "aicompatible-rag"
 version = "0.1.0"
 description = "Agentic RAG MCP Server — persistent semantic memory over private data"
 license = { text = "MIT" }
@@ -74,7 +74,7 @@ sync = [
     "cryptography>=42.0,<43.0",
 ]
 all = [
-    "rag-mcp-server[office,ebooks,web,sync]",
+    "aicompatible-rag[office,ebooks,web,sync]",
 ]
 
 [project.scripts]
