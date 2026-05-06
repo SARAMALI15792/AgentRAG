@@ -4,7 +4,7 @@
 > Runs fully local. No data leaves your machine.
 
 [![CI](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/SARAMALI15792/AgentRAG/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/aicompatible-rag)](https://pypi.org/project/aicompatible-rag/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.1.0-blue)](https://pypi.org/project/aicompatible-rag/)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![mypy: strict](https://img.shields.io/badge/mypy-strict-brightgreen)](https://mypy.readthedocs.io/)
@@ -122,6 +122,8 @@ Once registered, Claude Code can call all AgentRAG tools (`ingest_file`, `search
 
 Any VS Code extension that supports MCP servers (e.g. GitHub Copilot with MCP, or the official MCP extension) can connect to AgentRAG over HTTP transport.
 
+> **Why `localhost`?** VS Code does not support `stdio` transport — it requires an HTTP URL. `localhost:8000` is the address of AgentRAG running on your own machine. No data leaves your computer; the URL is purely local.
+
 **Step 1 — start AgentRAG in HTTP mode:**
 
 ```bash
@@ -145,6 +147,8 @@ AGENTRAG_TRANSPORT=http AGENTRAG_PORT=8000 agentrag serve
 ### JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.)
 
 JetBrains AI Assistant supports MCP servers via HTTP transport.
+
+> **Why `localhost`?** JetBrains AI Assistant requires an HTTP URL to connect to MCP servers. `localhost:8000` points to AgentRAG running on your own machine — the same privacy guarantee applies; nothing is sent over the network.
 
 **Step 1 — start AgentRAG in HTTP mode:**
 
